@@ -629,4 +629,14 @@ describe('Phase 8C Pagination & Page-Break Engineering (All 17 Scenarios)', () =
     expect(html).toContain('break-inside: avoid;');
     expect(html).toContain('content: counter(page);');
   });
+
+  it('P18. conversation stream uses block layout for reliable print pagination', () => {
+    const html = renderConversation(testConv);
+    expect(html).toContain('.conversation {\n      display: block;\n    }');
+  });
+
+  it('P19. message body uses block layout for reliable print pagination', () => {
+    const html = renderConversation(testConv);
+    expect(html).toContain('.message-body {\n      display: block;\n    }');
+  });
 });

@@ -77,8 +77,6 @@ export function generateDocumentStyles(options: RenderOptions): string {
       border-bottom: 1px solid ${tokens.colors.borderLight};
       padding-bottom: ${tokens.spacing.documentHeaderBottomPadding};
       margin-bottom: ${tokens.spacing.documentHeaderBottomMargin};
-      break-after: avoid;
-      page-break-after: avoid;
     }
 
     .document-title {
@@ -100,19 +98,19 @@ export function generateDocumentStyles(options: RenderOptions): string {
 
     /* ── Conversation & Message Stream ──────────────────────────────────── */
     .conversation {
-      display: flex;
-      flex-direction: column;
-      gap: ${tokens.spacing.messageGap};
-      break-inside: auto;
-      page-break-inside: auto;
+      display: block;
     }
 
     .message {
-      break-inside: auto;
-      page-break-inside: auto;
+      display: block;
       padding: ${tokens.spacing.messagePadding};
       border-radius: 6px;
       border: 1px solid ${tokens.colors.borderLight};
+      margin-bottom: ${tokens.spacing.messageGap};
+    }
+
+    .message:last-child {
+      margin-bottom: 0;
     }
 
     .message-user {
@@ -131,8 +129,6 @@ export function generateDocumentStyles(options: RenderOptions): string {
       text-transform: uppercase;
       letter-spacing: 0.05em;
       margin-bottom: 8px;
-      break-after: avoid;
-      page-break-after: avoid;
     }
 
     .message-user .message-role {
@@ -144,19 +140,20 @@ export function generateDocumentStyles(options: RenderOptions): string {
     }
 
     .message-body {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      break-inside: auto;
-      page-break-inside: auto;
+      display: block;
+    }
+
+    .message-body > * {
+      margin-bottom: 8px;
+    }
+
+    .message-body > *:last-child {
+      margin-bottom: 0;
     }
 
     /* ── Paragraphs & Typography ────────────────────────────────────────── */
     p {
-      margin-bottom: ${tokens.spacing.paragraphMarginBottom};
       color: ${tokens.colors.textPrimary};
-      orphans: 3;
-      widows: 3;
     }
 
     /* ── Links ───────────────────────────────────────────────────────────── */
@@ -175,10 +172,6 @@ export function generateDocumentStyles(options: RenderOptions): string {
       line-height: ${tokens.typography.lineHeightHeading};
       margin-top: ${options.headingSpacing ? tokens.spacing.headingMarginTop : '8px'};
       margin-bottom: ${tokens.spacing.headingMarginBottom};
-      break-after: avoid;
-      page-break-after: avoid;
-      break-inside: avoid;
-      page-break-inside: avoid;
     }
 
     h1 { font-size: ${tokens.typography.sizeH1}; font-weight: ${tokens.typography.weightBold}; }
@@ -191,15 +184,10 @@ export function generateDocumentStyles(options: RenderOptions): string {
     /* ── Lists ───────────────────────────────────────────────────────────── */
     ul, ol {
       padding-left: ${tokens.spacing.listPaddingLeft};
-      margin-bottom: ${tokens.spacing.paragraphMarginBottom};
-      break-inside: auto;
-      page-break-inside: auto;
     }
 
     li {
       margin-bottom: ${tokens.spacing.listItemMarginBottom};
-      break-inside: auto;
-      page-break-inside: auto;
     }
 
     ul ul, ol ol, ul ol, ol ul {
@@ -209,8 +197,6 @@ export function generateDocumentStyles(options: RenderOptions): string {
 
     /* ── Code Blocks ─────────────────────────────────────────────────────── */
     .code-wrapper {
-      break-inside: auto;
-      page-break-inside: auto;
       margin: ${tokens.spacing.blockMargin} 0;
       border-radius: 6px;
       border: 1px solid ${codeBorder};
@@ -226,10 +212,6 @@ export function generateDocumentStyles(options: RenderOptions): string {
       padding: 4px 12px;
       text-transform: lowercase;
       border-bottom: 1px solid ${codeBorder};
-      break-after: avoid;
-      page-break-after: avoid;
-      break-inside: avoid;
-      page-break-inside: avoid;
     }
 
     pre {
@@ -244,8 +226,6 @@ export function generateDocumentStyles(options: RenderOptions): string {
       overflow-wrap: break-word;
       word-break: break-word;
       overflow-x: auto;
-      break-inside: auto;
-      page-break-inside: auto;
     }
 
     pre code {
@@ -265,8 +245,6 @@ export function generateDocumentStyles(options: RenderOptions): string {
 
     /* ── Tables ──────────────────────────────────────────────────────────── */
     .table-wrapper {
-      break-inside: auto;
-      page-break-inside: auto;
       margin: ${tokens.spacing.blockMargin} 0;
       overflow-x: auto;
     }
@@ -275,25 +253,14 @@ export function generateDocumentStyles(options: RenderOptions): string {
       width: 100%;
       border-collapse: collapse;
       font-size: 0.95em;
-      break-inside: auto;
-      page-break-inside: auto;
     }
 
     thead {
       display: table-header-group;
-      break-after: avoid;
-      page-break-after: avoid;
-      break-inside: avoid;
-      page-break-inside: avoid;
     }
 
     tbody {
       display: table-row-group;
-    }
-
-    tr {
-      break-inside: avoid;
-      page-break-inside: avoid;
     }
 
     th, td {
@@ -316,22 +283,16 @@ export function generateDocumentStyles(options: RenderOptions): string {
 
     /* ── Blockquotes ─────────────────────────────────────────────────────── */
     blockquote {
-      break-inside: auto;
-      page-break-inside: auto;
       border-left: 4px solid ${tokens.colors.quoteBorder};
       background: ${tokens.colors.quoteBg};
       padding: ${tokens.spacing.quotePadding};
       margin: ${tokens.spacing.blockMargin} 0;
       font-style: italic;
       color: ${tokens.colors.quoteText};
-      orphans: 2;
-      widows: 2;
     }
 
     /* ── Images ──────────────────────────────────────────────────────────── */
     .image-wrapper {
-      break-inside: avoid;
-      page-break-inside: avoid;
       margin: ${tokens.spacing.blockMargin} 0;
       text-align: center;
     }
@@ -341,8 +302,6 @@ export function generateDocumentStyles(options: RenderOptions): string {
       height: auto;
       border-radius: 4px;
       border: 1px solid ${tokens.colors.borderLight};
-      break-inside: avoid;
-      page-break-inside: avoid;
     }
 
     .image-caption {
@@ -353,8 +312,6 @@ export function generateDocumentStyles(options: RenderOptions): string {
 
     /* ── Math ────────────────────────────────────────────────────────────── */
     .math-block {
-      break-inside: avoid;
-      page-break-inside: avoid;
       margin: ${tokens.spacing.blockMargin} 0;
       padding: 8px 12px;
       background: ${tokens.colors.quoteBg};
@@ -382,6 +339,103 @@ export function generateDocumentStyles(options: RenderOptions): string {
       justify-content: space-between;
       font-size: ${tokens.typography.sizeSmall};
       color: ${tokens.colors.textMuted};
+    }
+
+    /* ── Pagination & Print Flow Engineering ──────────────────────────────── */
+    .document-header {
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+
+    .conversation {
+      break-inside: auto;
+      page-break-inside: auto;
+    }
+
+    .message {
+      break-inside: auto;
+      page-break-inside: auto;
+    }
+
+    .message-role {
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+
+    .message-body {
+      break-inside: auto;
+      page-break-inside: auto;
+    }
+
+    p {
+      orphans: 3;
+      widows: 3;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      break-after: avoid;
+      page-break-after: avoid;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    ul, ol, li {
+      break-inside: auto;
+      page-break-inside: auto;
+    }
+
+    .code-wrapper {
+      break-inside: auto;
+      page-break-inside: auto;
+    }
+
+    .code-header {
+      break-after: avoid;
+      page-break-after: avoid;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    pre {
+      break-inside: auto;
+      page-break-inside: auto;
+    }
+
+    .table-wrapper, table {
+      break-inside: auto;
+      page-break-inside: auto;
+    }
+
+    thead {
+      break-after: avoid;
+      page-break-after: avoid;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    tr {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    blockquote {
+      break-inside: auto;
+      page-break-inside: auto;
+      orphans: 2;
+      widows: 2;
+    }
+
+    .image-wrapper, img {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .math-block {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .document-footer {
       break-inside: avoid;
       page-break-inside: avoid;
     }
