@@ -1,8 +1,12 @@
 /**
- * Extension Popup UI Controller — Phase 6.
+ * Extension Popup UI Controller — Phase 6.1.
  *
- * Handles active-tab ChatGPT support detection, export button action triggers,
+ * Handles active-tab ChatGPT conversation detection, export button action triggers,
  * progress feedback, error reporting, and navigation to settings page.
+ *
+ * Tab detection uses checkConversationReady() which queries the content script health
+ * check to distinguish: supported conversation page, ChatGPT non-conversation page,
+ * and unsupported sites.
  */
 
 import { ExportService } from '../../core/export/ExportService';
@@ -34,7 +38,10 @@ export class PopupUI {
 
   public hideStatus(): void {
     const statusBox = this.getElement<HTMLDivElement>('status-box');
-    if (statusBox) statusBox.style.display = 'none';
+    if (statusBox) {
+      statusBox.textContent = '';
+      statusBox.className = 'status-box';
+    }
   }
 
   public setExportButtonEnabled(enabled: boolean): void {
@@ -45,15 +52,30 @@ export class PopupUI {
   }
 
   public async init(): Promise<void> {
-    const isSupported = await this.exportService.checkSupport();
+    this.updateBadge('Checking page…', 'info');
 
-    if (isSupported) {
-      this.updateBadge('Ready on ChatGPT', 'success');
-      this.setExportButtonEnabled(true);
-    } else {
-      this.updateBadge('Unsupported page', 'error');
-      this.setExportButtonEnabled(false);
-      this.showStatus('Open a ChatGPT conversation to export.', 'info');
+    // Use richer health-check-backed detection to distinguish:
+    //   'conversation' — export-ready ChatGPT conversation
+    //   'chatgpt'      — ChatGPT host but no detectable conversation
+    //   'unsupported'  — not chatgpt.com at all
+    const readiness = await this.exportService.checkConversationReady();
+
+    switch (readiness) {
+      case 'conversation':
+        this.updateBadge('Ready — ChatGPT conversation', 'success');
+        this.setExportButtonEnabled(true);
+        break;
+      case 'chatgpt':
+        this.updateBadge('ChatGPT (no conversation)', 'warn');
+        this.setExportButtonEnabled(false);
+        this.showStatus('Open a ChatGPT conversation to export.', 'info');
+        break;
+      case 'unsupported':
+      default:
+        this.updateBadge('Unsupported page', 'error');
+        this.setExportButtonEnabled(false);
+        this.showStatus('Navigate to a ChatGPT conversation to export.', 'info');
+        break;
     }
 
     const exportBtn = this.getElement<HTMLButtonElement>('export-btn');
@@ -75,28 +97,33 @@ export class PopupUI {
     const exportBtn = this.getElement<HTMLButtonElement>('export-btn');
     if (exportBtn) exportBtn.disabled = true;
 
+    this.hideStatus();
+
     try {
       const result = await this.exportService.exportCurrentTab((state) => {
         switch (state) {
           case 'extracting':
-            this.showStatus('Extracting conversation content...', 'info');
+            this.showStatus('Extracting conversation…', 'info');
             break;
           case 'rendering':
-            this.showStatus('Preparing printable document...', 'info');
+            this.showStatus('Preparing printable document…', 'info');
             break;
           case 'printing':
-            this.showStatus('Opening print dialog...', 'info');
+            this.showStatus('Opening print dialog…', 'info');
             break;
         }
       });
 
       if (result.success) {
-        this.showStatus('Print dialog opened. Select "Save as PDF" to save your document.', 'success');
+        this.showStatus(
+          'Print dialog opened. Select "Save as PDF" to save your document.',
+          'success'
+        );
       } else {
         const errorMsg = result.errorUserMessage || 'Export failed. Please try again.';
         this.showStatus(errorMsg, 'error');
       }
-    } catch (err) {
+    } catch {
       this.showStatus('Export failed unexpectedly. Please try again.', 'error');
     } finally {
       if (exportBtn) exportBtn.disabled = false;

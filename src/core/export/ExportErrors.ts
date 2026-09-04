@@ -1,5 +1,5 @@
 /**
- * Structured Export Errors & Error Codes — Phase 6.
+ * Structured Export Errors & Error Codes — Phase 6.1.
  *
  * Defines strongly typed error codes and human-readable error messages
  * for all potential failure points in the export workflow.
@@ -14,6 +14,7 @@ export enum ExportErrorCode {
   RENDER_FAILED = 'RENDER_FAILED',
   PRINT_FAILED = 'PRINT_FAILED',
   PRINT_TIMEOUT = 'PRINT_TIMEOUT',
+  EXPORT_IN_PROGRESS = 'EXPORT_IN_PROGRESS',
 }
 
 const ERROR_USER_MESSAGES: Record<ExportErrorCode, string> = {
@@ -25,6 +26,7 @@ const ERROR_USER_MESSAGES: Record<ExportErrorCode, string> = {
   [ExportErrorCode.RENDER_FAILED]: 'Failed to render document. Please check settings.',
   [ExportErrorCode.PRINT_FAILED]: 'Could not open browser print dialog. Please try again.',
   [ExportErrorCode.PRINT_TIMEOUT]: 'Print preparation timed out. Please try again.',
+  [ExportErrorCode.EXPORT_IN_PROGRESS]: 'An export is already running. Please wait.',
 };
 
 export class ExportError extends Error {

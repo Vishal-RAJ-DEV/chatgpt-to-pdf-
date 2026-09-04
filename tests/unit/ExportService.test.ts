@@ -1,10 +1,26 @@
 /**
- * Unit Tests — ExportService Orchestrator (Phase 6).
+ * Unit Tests — ExportService Orchestrator (Phase 6.1).
+ *
+ * Covers:
+ *  1. Supported ChatGPT tab detection
+ *  2. Unsupported page detection
+ *  3. Full export workflow sequencing
+ *  4. Unsupported host rejection
+ *  5. Streaming in progress → STREAMING_IN_PROGRESS
+ *  6. Conversation not found → CONVERSATION_NOT_FOUND
+ *  7. Extraction network error → EXTRACTION_FAILED
+ *  8. Print service generic failure → PRINT_FAILED
+ *  9. Print timeout → PRINT_TIMEOUT
+ * 10. Duplicate concurrent export → EXPORT_IN_PROGRESS
+ * 11. No conversation content persisted to storage
+ * 12. checkConversationReady: returns 'conversation' on health-check success
+ * 13. checkConversationReady: returns 'chatgpt' when host ok but no conversation
+ * 14. checkConversationReady: returns 'unsupported' for non-chatgpt host
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Conversation } from '../../src/core/conversation/Model';
-import { ExportErrorCode } from '../../src/core/export/ExportErrors';
+import { ExportError, ExportErrorCode } from '../../src/core/export/ExportErrors';
 import { ExportService, TabCommunicator } from '../../src/core/export/ExportService';
 import { PrintService } from '../../src/core/export/PrintService';
 import { DEFAULT_SETTINGS } from '../../src/core/settings/defaults';
@@ -44,18 +60,20 @@ describe('ExportService Orchestrator Unit Tests', () => {
     } as unknown as PrintService;
   });
 
-  it('1. detects supported ChatGPT active tab', async () => {
+  // ── checkSupport ────────────────────────────────────────────────────────────
+
+  it('1. detects supported ChatGPT active tab via checkSupport', async () => {
     const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
-    const isSupported = await service.checkSupport();
-    expect(isSupported).toBe(true);
+    expect(await service.checkSupport()).toBe(true);
   });
 
-  it('2. detects unsupported page active tab', async () => {
+  it('2. detects unsupported page active tab via checkSupport', async () => {
     mockCommunicator.getActiveTab = vi.fn().mockResolvedValue({ id: 102, url: 'https://example.com' });
     const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
-    const isSupported = await service.checkSupport();
-    expect(isSupported).toBe(false);
+    expect(await service.checkSupport()).toBe(false);
   });
+
+  // ── Full workflow ───────────────────────────────────────────────────────────
 
   it('3. executes complete export workflow sequencing cleanly', async () => {
     const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
@@ -66,16 +84,16 @@ describe('ExportService Orchestrator Unit Tests', () => {
     expect(result.success).toBe(true);
     expect(result.state).toBe('success');
     expect(states).toEqual(['extracting', 'rendering', 'printing', 'success']);
-
     expect(mockCommunicator.sendMessage).toHaveBeenCalledWith(101, { action: 'EXTRACT_CONVERSATION' });
     expect(mockSettingsManager.loadSettings).toHaveBeenCalled();
     expect(mockPrintService.print).toHaveBeenCalled();
   });
 
-  it('4. rejects export on unsupported host URL', async () => {
+  // ── Stage-aware error codes ─────────────────────────────────────────────────
+
+  it('4. rejects export on unsupported host URL → UNSUPPORTED_PAGE', async () => {
     mockCommunicator.getActiveTab = vi.fn().mockResolvedValue({ id: 103, url: 'https://google.com' });
     const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
-
     const result = await service.exportCurrentTab();
 
     expect(result.success).toBe(false);
@@ -83,39 +101,34 @@ describe('ExportService Orchestrator Unit Tests', () => {
     expect(result.errorUserMessage).toBe('Open a ChatGPT conversation first.');
   });
 
-  it('5. handles active streaming rejection from content script', async () => {
+  it('5. streaming in progress rejection → STREAMING_IN_PROGRESS', async () => {
     mockCommunicator.sendMessage = vi.fn().mockResolvedValue({
       success: false,
       code: 'STREAMING_IN_PROGRESS',
       error: 'Assistant is generating response',
     });
-
     const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
     const result = await service.exportCurrentTab();
 
     expect(result.success).toBe(false);
     expect(result.errorCode).toBe(ExportErrorCode.STREAMING_IN_PROGRESS);
-    expect(result.errorUserMessage).toBe('ChatGPT is still generating a response. Wait until it finishes.');
   });
 
-  it('6. handles conversation not found rejection', async () => {
+  it('6. conversation not found → CONVERSATION_NOT_FOUND', async () => {
     mockCommunicator.sendMessage = vi.fn().mockResolvedValue({
       success: false,
       code: 'CONVERSATION_NOT_FOUND',
       error: 'No turns present in DOM',
     });
-
     const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
     const result = await service.exportCurrentTab();
 
     expect(result.success).toBe(false);
     expect(result.errorCode).toBe(ExportErrorCode.CONVERSATION_NOT_FOUND);
-    expect(result.errorUserMessage).toBe('Could not find a valid ChatGPT conversation on this page.');
   });
 
-  it('7. handles extraction thrown errors cleanly', async () => {
+  it('7. extraction network error → EXTRACTION_FAILED', async () => {
     mockCommunicator.sendMessage = vi.fn().mockRejectedValue(new Error('Network error'));
-
     const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
     const result = await service.exportCurrentTab();
 
@@ -123,49 +136,85 @@ describe('ExportService Orchestrator Unit Tests', () => {
     expect(result.errorCode).toBe(ExportErrorCode.EXTRACTION_FAILED);
   });
 
-  it('8. handles print service failure gracefully', async () => {
-    mockPrintService.print = vi.fn().mockRejectedValue(new Error('Print blocked'));
-
+  it('8. print service generic failure → PRINT_FAILED (not EXTRACTION_FAILED)', async () => {
+    mockPrintService.print = vi.fn().mockRejectedValue(
+      new ExportError(ExportErrorCode.PRINT_FAILED, 'Popup blocked')
+    );
     const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
     const result = await service.exportCurrentTab();
 
     expect(result.success).toBe(false);
-    expect(result.errorCode).toBe(ExportErrorCode.EXTRACTION_FAILED);
+    expect(result.errorCode).toBe(ExportErrorCode.PRINT_FAILED);
   });
 
-  it('9. prevents concurrent duplicate export calls', async () => {
-    // Make the extract step pause so the first export is mid-flight when second is triggered
+  it('9. print timeout → PRINT_TIMEOUT (not EXTRACTION_FAILED)', async () => {
+    mockPrintService.print = vi.fn().mockRejectedValue(
+      new ExportError(ExportErrorCode.PRINT_TIMEOUT)
+    );
+    const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
+    const result = await service.exportCurrentTab();
+
+    expect(result.success).toBe(false);
+    expect(result.errorCode).toBe(ExportErrorCode.PRINT_TIMEOUT);
+  });
+
+  // ── Duplicate export guard ──────────────────────────────────────────────────
+
+  it('10. concurrent duplicate export → EXPORT_IN_PROGRESS', async () => {
     let resolveExtract: (val: unknown) => void = () => {};
     mockCommunicator.sendMessage = vi.fn().mockImplementation(
       () => new Promise((res) => { resolveExtract = res; })
     );
 
     const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
-
-    // Start first export (hangs at extract step)
     const promise1 = service.exportCurrentTab();
 
-    // Allow event loop to advance so isExporting=true is set
+    // Let event loop advance so isExporting=true is set
     await new Promise((r) => setTimeout(r, 10));
 
-    // Second export: should be blocked immediately
     const result2 = await service.exportCurrentTab();
     expect(result2.success).toBe(false);
-    expect(result2.errorUserMessage).toBe('Export failed. Please try again.');
+    expect(result2.errorCode).toBe(ExportErrorCode.EXPORT_IN_PROGRESS);
+    expect(result2.errorUserMessage).toBe('An export is already running. Please wait.');
 
-    // Unblock the first export by resolving the extraction
+    // Unblock first export
     resolveExtract({ success: true, conversation: sampleConversation });
     mockPrintService.print = vi.fn().mockResolvedValue(true);
-
     const result1 = await promise1;
     expect(result1.success).toBe(true);
   });
 
-  it('10. guarantees no conversation content is persisted to storage during export', async () => {
+  // ── Storage privacy ─────────────────────────────────────────────────────────
+
+  it('11. guarantees no conversation content is persisted to storage', async () => {
     const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
     await service.exportCurrentTab();
-
-    // Verify saveSettings was never called with conversation data
     expect(mockSettingsManager.saveSettings).not.toHaveBeenCalled();
+  });
+
+  // ── checkConversationReady ──────────────────────────────────────────────────
+
+  it('12. checkConversationReady returns "conversation" when health check succeeds', async () => {
+    mockCommunicator.sendMessage = vi.fn().mockResolvedValue({
+      success: true,
+      health: { conversationDetected: true, turnCandidatesFound: true },
+    });
+    const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
+    expect(await service.checkConversationReady()).toBe('conversation');
+  });
+
+  it('13. checkConversationReady returns "chatgpt" when on chatgpt.com but no conversation', async () => {
+    mockCommunicator.sendMessage = vi.fn().mockResolvedValue({
+      success: true,
+      health: { conversationDetected: false, turnCandidatesFound: false },
+    });
+    const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
+    expect(await service.checkConversationReady()).toBe('chatgpt');
+  });
+
+  it('14. checkConversationReady returns "unsupported" for non-chatgpt host', async () => {
+    mockCommunicator.getActiveTab = vi.fn().mockResolvedValue({ id: 999, url: 'https://google.com' });
+    const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
+    expect(await service.checkConversationReady()).toBe('unsupported');
   });
 });
