@@ -141,6 +141,93 @@ describe('RichContentExtractor Block Parsers against Combined Fixture', () => {
   });
 });
 
+describe('Nested List Isolation & Inline Handling', () => {
+  it('prevents parent/child text & inline duplication in nested lists', () => {
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <ul>
+        <li>
+          Parent item
+          <ul>
+            <li>Child item</li>
+          </ul>
+        </li>
+      </ul>
+    `;
+    const blocks = extractContentBlocks(div);
+    const list = blocks[0] as ListBlock;
+    const parent = list.items[0];
+    const child = parent.children![0];
+
+    expect(parent.text).toBe('Parent item');
+    expect(child.text).toBe('Child item');
+    if (parent.inlines) {
+      const parentInlineTexts = parent.inlines.map((i) => (i.type === 'code' ? i.code : i.text));
+      expect(parentInlineTexts.join('')).not.toContain('Child item');
+    }
+    expect(parent.children).toHaveLength(1);
+  });
+
+  it('extracts inline code and links in parent item without capturing nested list text', () => {
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <ul>
+        <li>
+          Start <code>inline</code> and <a href="https://example.com">Example</a>
+          <ul>
+            <li>Nested child</li>
+          </ul>
+        </li>
+      </ul>
+    `;
+    const blocks = extractContentBlocks(div);
+    const list = blocks[0] as ListBlock;
+    const parent = list.items[0];
+
+    expect(parent.text).toBe('Start inline and Example');
+    expect(parent.inlines).toEqual([
+      { type: 'text', text: 'Start ' },
+      { type: 'code', code: 'inline' },
+      { type: 'text', text: ' and ' },
+      { type: 'link', href: 'https://example.com', text: 'Example' },
+    ]);
+    expect(parent.children).toHaveLength(1);
+    expect(parent.children![0].text).toBe('Nested child');
+  });
+
+  it('prevents text/inline leakage across deep 3-level list nesting', () => {
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <ul>
+        <li>
+          Parent
+          <ul>
+            <li>
+              Child
+              <ul>
+                <li>Grandchild</li>
+              </ul>
+            </li>
+          </ul>
+        </li>
+      </ul>
+    `;
+    const blocks = extractContentBlocks(div);
+    const list = blocks[0] as ListBlock;
+    const parent = list.items[0];
+    const child = parent.children![0];
+    const grandchild = child.children![0];
+
+    expect(parent.text).toBe('Parent');
+    expect(child.text).toBe('Child');
+    expect(grandchild.text).toBe('Grandchild');
+
+    expect(JSON.stringify(parent.inlines || [])).not.toContain('Child');
+    expect(JSON.stringify(parent.inlines || [])).not.toContain('Grandchild');
+    expect(JSON.stringify(child.inlines || [])).not.toContain('Grandchild');
+  });
+});
+
 describe('Image Parsing', () => {
   it('parses <img> tags into ImageBlock without making network requests', () => {
     const div = document.createElement('div');

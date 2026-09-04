@@ -183,7 +183,7 @@ describe('DocumentRenderer Full Regression Suite (All 36 Scenarios)', () => {
     expect(html).toContain('<p>How do I test HTML?</p>');
   });
 
-  it('10. nested unordered lists', () => {
+  it('10. nested unordered lists without text duplication', () => {
     const conv: Conversation = {
       id: 'c1',
       title: 'UL List',
@@ -196,14 +196,19 @@ describe('DocumentRenderer Full Regression Suite (All 36 Scenarios)', () => {
             {
               type: 'list',
               ordered: false,
-              items: [{ text: 'Parent', children: [{ text: 'Child' }] }],
+              items: [{ text: 'Parent Item', children: [{ text: 'Child Item' }] }],
             },
           ],
         },
       ],
     };
     const html = renderConversation(conv);
-    expect(html).toContain('<ul><li>Parent<ul><li>Child</li></ul></li></ul>');
+    const parentMatches = (html.match(/Parent Item/g) || []).length;
+    const childMatches = (html.match(/Child Item/g) || []).length;
+
+    expect(parentMatches).toBe(1);
+    expect(childMatches).toBe(1);
+    expect(html).toContain('<ul><li>Parent Item<ul><li>Child Item</li></ul></li></ul>');
   });
 
   it('11. nested ordered lists', () => {

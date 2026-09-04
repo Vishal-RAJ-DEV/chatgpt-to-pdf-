@@ -175,24 +175,113 @@ function parseHeading(el: Element): HeadingBlock | null {
 }
 
 /**
+ * Extracts text and inline nodes from the direct content of a list item while excluding nested sub-lists (<ul> / <ol>).
+ */
+export function extractListItemContent(liEl: Element): { text: string; inlines: InlineNode[] } {
+  const inlines: InlineNode[] = [];
+  const textParts: string[] = [];
+
+  function traverse(node: Node) {
+    if (node.nodeType === 3 /* Node.TEXT_NODE */) {
+      const text = node.textContent || '';
+      if (text) {
+        textParts.push(text);
+        inlines.push({ type: 'text', text });
+      }
+      return;
+    }
+
+    if (node.nodeType === 1 /* Node.ELEMENT_NODE */) {
+      const elem = node as Element;
+      const tag = elem.tagName.toLowerCase();
+
+      // STOP TRAVERSAL: Ignore sub-lists (ul / ol) and all their descendants
+      if (tag === 'ul' || tag === 'ol') {
+        return;
+      }
+
+      if (tag === 'code') {
+        const codeText = elem.textContent || '';
+        if (codeText) {
+          textParts.push(codeText);
+          inlines.push({ type: 'code', code: codeText });
+        }
+        return;
+      }
+
+      if (tag === 'a') {
+        const href = elem.getAttribute('href') || '';
+        const linkText = elem.textContent || href;
+        if (href || linkText) {
+          textParts.push(linkText);
+          inlines.push({ type: 'link', href, text: linkText });
+        }
+        return;
+      }
+
+      Array.from(elem.childNodes).forEach((child) => traverse(child));
+    }
+  }
+
+  Array.from(liEl.childNodes).forEach((child) => traverse(child));
+
+  const mergedInlines: InlineNode[] = [];
+  for (const item of inlines) {
+    if (item.type === 'text') {
+      if (!item.text) continue;
+      if (mergedInlines.length > 0 && mergedInlines[mergedInlines.length - 1].type === 'text') {
+        (mergedInlines[mergedInlines.length - 1] as { type: 'text'; text: string }).text += item.text;
+      } else {
+        mergedInlines.push({ type: 'text', text: item.text });
+      }
+    } else {
+      mergedInlines.push(item);
+    }
+  }
+
+  const rawText = textParts.join('');
+  const normalizedText = normalizeText(rawText).trim();
+
+  if (mergedInlines.length > 0 && mergedInlines[0].type === 'text') {
+    const trimmedFirst = mergedInlines[0].text.replace(/^\s+/, '');
+    if (trimmedFirst) {
+      (mergedInlines[0] as { type: 'text'; text: string }).text = trimmedFirst;
+    } else {
+      mergedInlines.shift();
+    }
+  }
+  if (mergedInlines.length > 0) {
+    const last = mergedInlines[mergedInlines.length - 1];
+    if (last.type === 'text') {
+      const trimmedLast = last.text.replace(/\s+$/, '');
+      if (trimmedLast) {
+        (mergedInlines[mergedInlines.length - 1] as { type: 'text'; text: string }).text = trimmedLast;
+      } else {
+        mergedInlines.pop();
+      }
+    }
+  }
+
+  const hasSpecialNodes = mergedInlines.some((m) => m.type === 'code' || m.type === 'link');
+  const finalInlines = hasSpecialNodes ? mergedInlines : [];
+
+  return {
+    text: normalizedText,
+    inlines: finalInlines,
+  };
+}
+
+/**
  * Recursively parses a single <li> element into a ListItem.
  */
 function parseListItem(liEl: Element): ListItem | null {
-  // Find immediate child sub-lists
-  const subListEls = Array.from(liEl.children).filter(
-    (child) => child.tagName === 'UL' || child.tagName === 'OL'
+  // Extract direct text and inline nodes belonging strictly to this item (excluding sub-lists)
+  const { text, inlines } = extractListItemContent(liEl);
+
+  // Find immediate child sub-lists belonging directly to this <li>
+  const subListEls = Array.from(liEl.querySelectorAll('ul, ol')).filter(
+    (subList) => subList.closest('li') === liEl
   );
-
-  // Clone <li> and remove sub-lists to extract item text without duplicating child list text
-  const liClone = liEl.cloneNode(true) as Element;
-  Array.from(liClone.children).forEach((child) => {
-    if (child.tagName === 'UL' || child.tagName === 'OL') {
-      child.remove();
-    }
-  });
-
-  const text = normalizeText(liClone.textContent || '');
-  const inlines = parseInlinesFromElement(liClone);
 
   const children: ListItem[] = [];
   let childOrdered: boolean | undefined = undefined;
