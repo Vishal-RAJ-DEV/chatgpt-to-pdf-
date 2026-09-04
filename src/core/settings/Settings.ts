@@ -28,6 +28,8 @@ export interface UserSettings {
   showAssistantMessages: boolean;
   showConversationTitle: boolean;
   showDate: boolean;
+  showRoleLabels: boolean;
+  showConversationSource: boolean;
   showFooterPageNumbers: boolean;
 
   // Code formatting

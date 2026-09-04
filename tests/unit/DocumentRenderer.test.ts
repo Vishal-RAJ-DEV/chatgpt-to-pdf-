@@ -648,3 +648,58 @@ describe('Phase 8C Pagination & Page-Break Engineering (All 17 Scenarios)', () =
     expect(html).toContain('.table-wrapper {\n      margin: 10px 0;');
   });
 });
+
+describe('Phase 8D PDFCrowd-Inspired Export Options & Controls', () => {
+  const testConv: Conversation = {
+    id: 'c-8d',
+    title: 'Phase 8D Option Test',
+    url: 'https://chatgpt.com/c/c-8d-url',
+    createdAt: '2026-09-04T15:00:00Z',
+    messages: [
+      {
+        id: 'm1',
+        role: 'user',
+        blocks: [{ type: 'paragraph', text: 'Hello' }],
+      },
+      {
+        id: 'm2',
+        role: 'assistant',
+        blocks: [{ type: 'paragraph', text: 'Hi there!' }],
+      },
+    ],
+  };
+
+  it('1. showRoleLabels = true renders role headers (User / Assistant)', () => {
+    const html = renderConversation(testConv, { showRoleLabels: true });
+    expect(html).toContain('<div class="message-role">User</div>');
+    expect(html).toContain('<div class="message-role">Assistant</div>');
+  });
+
+  it('2. showRoleLabels = false suppresses role headers', () => {
+    const html = renderConversation(testConv, { showRoleLabels: false });
+    expect(html).not.toContain('<div class="message-role">User</div>');
+    expect(html).not.toContain('<div class="message-role">Assistant</div>');
+    expect(html).not.toContain('class="message-role"');
+  });
+
+  it('3. showConversationSource = false hides source URL link in document metadata', () => {
+    const html = renderConversation(testConv, { showConversationSource: false });
+    expect(html).not.toContain('https://chatgpt.com/c/c-8d-url');
+    expect(html).not.toContain('Source:');
+  });
+
+  it('4. showConversationSource = true renders source URL link in document header', () => {
+    const html = renderConversation(testConv, { showConversationSource: true });
+    expect(html).toContain('Source: <a href="https://chatgpt.com/c/c-8d-url">https://chatgpt.com/c/c-8d-url</a>');
+  });
+
+  it('5. showConversationSource sanitizes unsafe URLs', () => {
+    const unsafeConv: Conversation = {
+      ...testConv,
+      url: 'javascript:alert(1)',
+    };
+    const html = renderConversation(unsafeConv, { showConversationSource: true });
+    expect(html).not.toContain('href="javascript:');
+    expect(html).not.toContain('Source:');
+  });
+});

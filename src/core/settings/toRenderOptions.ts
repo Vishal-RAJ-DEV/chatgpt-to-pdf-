@@ -32,6 +32,8 @@ export function toRenderOptions(settings: UserSettings): RenderOptions {
     showDate: safeSettings.showDate,
     showUserMessages: safeSettings.showUserMessages,
     showAssistantMessages: safeSettings.showAssistantMessages,
+    showRoleLabels: safeSettings.showRoleLabels,
+    showConversationSource: safeSettings.showConversationSource,
     showFooterPageNumbers: safeSettings.showFooterPageNumbers,
 
     codeTheme: safeSettings.codeTheme,

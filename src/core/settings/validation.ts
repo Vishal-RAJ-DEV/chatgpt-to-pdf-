@@ -130,6 +130,8 @@ export function validateSettings(input: unknown): UserSettings {
     showAssistantMessages: validateBoolean(record.showAssistantMessages, DEFAULT_SETTINGS.showAssistantMessages),
     showConversationTitle: validateBoolean(record.showConversationTitle, DEFAULT_SETTINGS.showConversationTitle),
     showDate: validateBoolean(record.showDate, DEFAULT_SETTINGS.showDate),
+    showRoleLabels: validateBoolean(record.showRoleLabels, DEFAULT_SETTINGS.showRoleLabels),
+    showConversationSource: validateBoolean(record.showConversationSource, DEFAULT_SETTINGS.showConversationSource),
     showFooterPageNumbers: validateBoolean(record.showFooterPageNumbers, DEFAULT_SETTINGS.showFooterPageNumbers),
 
     codeTheme: validateCodeTheme(record.codeTheme, DEFAULT_SETTINGS.codeTheme),
@@ -194,6 +196,12 @@ export function validatePartialSettings(input: unknown): Partial<UserSettings> {
   }
   if ('showDate' in record && typeof record.showDate === 'boolean') {
     result.showDate = record.showDate;
+  }
+  if ('showRoleLabels' in record && typeof record.showRoleLabels === 'boolean') {
+    result.showRoleLabels = record.showRoleLabels;
+  }
+  if ('showConversationSource' in record && typeof record.showConversationSource === 'boolean') {
+    result.showConversationSource = record.showConversationSource;
   }
   if ('showFooterPageNumbers' in record && typeof record.showFooterPageNumbers === 'boolean') {
     result.showFooterPageNumbers = record.showFooterPageNumbers;

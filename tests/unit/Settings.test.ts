@@ -46,6 +46,8 @@ describe('Settings Defaults & Validation Engine', () => {
       showAssistantMessages: false,
       showConversationTitle: true,
       showDate: false,
+      showRoleLabels: true,
+      showConversationSource: true,
       showFooterPageNumbers: true,
       codeTheme: 'light',
       headingSpacing: false,

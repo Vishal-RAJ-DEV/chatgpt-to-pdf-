@@ -60,6 +60,12 @@ export class OptionsUI {
     const showDate = this.getElement<HTMLInputElement>('showDate');
     if (showDate) showDate.checked = settings.showDate;
 
+    const showRoleLabels = this.getElement<HTMLInputElement>('showRoleLabels');
+    if (showRoleLabels) showRoleLabels.checked = settings.showRoleLabels;
+
+    const showConversationSource = this.getElement<HTMLInputElement>('showConversationSource');
+    if (showConversationSource) showConversationSource.checked = settings.showConversationSource;
+
     const showFooterPageNumbers = this.getElement<HTMLInputElement>('showFooterPageNumbers');
     if (showFooterPageNumbers) showFooterPageNumbers.checked = settings.showFooterPageNumbers;
 
@@ -87,6 +93,8 @@ export class OptionsUI {
       showAssistantMessages: Boolean(this.getElement<HTMLInputElement>('showAssistantMessages')?.checked),
       showConversationTitle: Boolean(this.getElement<HTMLInputElement>('showConversationTitle')?.checked),
       showDate: Boolean(this.getElement<HTMLInputElement>('showDate')?.checked),
+      showRoleLabels: Boolean(this.getElement<HTMLInputElement>('showRoleLabels')?.checked),
+      showConversationSource: Boolean(this.getElement<HTMLInputElement>('showConversationSource')?.checked),
       showFooterPageNumbers: Boolean(this.getElement<HTMLInputElement>('showFooterPageNumbers')?.checked),
 
       codeTheme: this.getElement<HTMLSelectElement>('codeTheme')?.value as CodeTheme,

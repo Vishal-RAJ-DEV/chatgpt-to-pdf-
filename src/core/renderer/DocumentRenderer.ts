@@ -304,15 +304,19 @@ function renderBlock(block: ContentBlock): string {
 /**
  * Render a single Message turn card.
  */
-function renderMessage(message: Message): string {
+function renderMessage(message: Message, showRoleLabels: boolean = true): string {
   const roleClass = message.role === 'user' ? 'message-user' : 'message-assistant';
   const roleLabel = message.role === 'user' ? 'User' : 'Assistant';
+
+  const roleHtml = showRoleLabels
+    ? `<div class="message-role">${escapeHtml(roleLabel)}</div>`
+    : '';
 
   const blocksHtml = message.blocks.map(renderBlock).join('');
 
   return `
     <article class="message ${roleClass}">
-      <div class="message-role">${escapeHtml(roleLabel)}</div>
+      ${roleHtml}
       <div class="message-body">
         ${blocksHtml}
       </div>
@@ -341,7 +345,9 @@ export function renderConversation(
     return true;
   });
 
-  const messagesHtml = filteredMessages.map(renderMessage).join('');
+  const messagesHtml = filteredMessages
+    .map((msg) => renderMessage(msg, opts.showRoleLabels))
+    .join('');
 
   const titleHtml = opts.showConversationTitle
     ? `<h1 class="document-title">${escapeHtml(conversation.title)}</h1>`
@@ -352,13 +358,21 @@ export function renderConversation(
     ? `<span>Exported on ${dateStr}</span>`
     : '';
 
+  const safeSourceUrl = opts.showConversationSource ? sanitizeUrl(conversation.url) : '';
+  const sourceHtml = safeSourceUrl
+    ? `<span>Source: <a href="${safeSourceUrl}">${escapeHtml(conversation.url)}</a></span>`
+    : '';
+
+  const metaItems = [dateHtml, sourceHtml].filter(Boolean);
+  const metaHtml = metaItems.length > 0
+    ? `<div class="document-metadata">${metaItems.join('')}</div>`
+    : '';
+
   const headerHtml =
-    opts.showConversationTitle || (opts.showDate && dateStr)
+    opts.showConversationTitle || metaItems.length > 0
       ? `<header class="document-header">
           ${titleHtml}
-          <div class="document-metadata">
-            ${dateHtml}
-          </div>
+          ${metaHtml}
         </header>`
       : '';
 

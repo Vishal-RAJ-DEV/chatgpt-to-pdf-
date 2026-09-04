@@ -22,6 +22,8 @@ export const DEFAULT_SETTINGS: Readonly<UserSettings> = Object.freeze({
   showAssistantMessages: true,
   showConversationTitle: true,
   showDate: true,
+  showRoleLabels: true,
+  showConversationSource: false,
   showFooterPageNumbers: true,
 
   codeTheme: 'dark',

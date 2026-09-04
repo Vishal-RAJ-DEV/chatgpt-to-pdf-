@@ -21,6 +21,8 @@ export interface RenderOptions {
   showDate: boolean;
   showUserMessages: boolean;
   showAssistantMessages: boolean;
+  showRoleLabels: boolean;
+  showConversationSource: boolean;
   showFooterPageNumbers: boolean;
 
   codeTheme: 'light' | 'dark';
@@ -43,6 +45,8 @@ export const DEFAULT_RENDER_OPTIONS: RenderOptions = {
   showDate: true,
   showUserMessages: true,
   showAssistantMessages: true,
+  showRoleLabels: true,
+  showConversationSource: false,
   showFooterPageNumbers: true,
 
   codeTheme: 'dark',

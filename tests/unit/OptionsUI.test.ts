@@ -43,6 +43,8 @@ describe('Options UI Controller', () => {
         <input type="checkbox" id="showAssistantMessages" checked>
         <input type="checkbox" id="showConversationTitle" checked>
         <input type="checkbox" id="showDate" checked>
+        <input type="checkbox" id="showRoleLabels" checked>
+        <input type="checkbox" id="showConversationSource">
         <input type="checkbox" id="showFooterPageNumbers" checked>
         <select id="codeTheme"><option value="dark">dark</option><option value="light">light</option></select>
         <input type="checkbox" id="headingSpacing" checked>
@@ -60,15 +62,21 @@ describe('Options UI Controller', () => {
       pageSize: 'LETTER',
       codeTheme: 'light',
       showUserMessages: false,
+      showRoleLabels: false,
+      showConversationSource: true,
     });
 
     const pageSizeSelect = document.getElementById('pageSize') as HTMLSelectElement;
     const codeThemeSelect = document.getElementById('codeTheme') as HTMLSelectElement;
     const showUserMsgCheck = document.getElementById('showUserMessages') as HTMLInputElement;
+    const showRoleLabelsCheck = document.getElementById('showRoleLabels') as HTMLInputElement;
+    const showSourceCheck = document.getElementById('showConversationSource') as HTMLInputElement;
 
     expect(pageSizeSelect.value).toBe('LETTER');
     expect(codeThemeSelect.value).toBe('light');
     expect(showUserMsgCheck.checked).toBe(false);
+    expect(showRoleLabelsCheck.checked).toBe(false);
+    expect(showSourceCheck.checked).toBe(true);
   });
 
   it('2. reads current form values into plain object', () => {
@@ -79,6 +87,8 @@ describe('Options UI Controller', () => {
     const values = ui.readForm();
     expect(values.pageSize).toBe('LETTER');
     expect(values.showUserMessages).toBe(true);
+    expect(values.showRoleLabels).toBe(true);
+    expect(values.showConversationSource).toBe(false);
   });
 
   it('3. initializes UI by loading persisted settings', async () => {

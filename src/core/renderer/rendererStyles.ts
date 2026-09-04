@@ -94,6 +94,12 @@ export function generateDocumentStyles(options: RenderOptions): string {
       color: ${tokens.colors.textMuted};
       display: flex;
       gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .document-metadata a {
+      color: ${tokens.colors.textMuted};
+      text-decoration: underline;
     }
 
     /* ── Conversation & Message Stream ──────────────────────────────────── */
