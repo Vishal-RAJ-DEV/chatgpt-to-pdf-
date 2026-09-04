@@ -48,6 +48,11 @@ export function findTurnCandidates(root: Document | Element = typeof document !=
       return Array.from(nodes);
     }
   }
+  // Secondary fallback: find elements with data-message-author-role or turn-like testids
+  const fallbackNodes = container.querySelectorAll('[data-message-author-role], [data-testid*="conversation-turn-"], article.w-full');
+  if (fallbackNodes.length > 0) {
+    return Array.from(fallbackNodes);
+  }
   return [];
 }
 
@@ -65,6 +70,11 @@ export function getRoleFromElement(element: Element): 'user' | 'assistant' | 'sy
   const testId = element.getAttribute('data-testid') || '';
   if (testId.includes('user')) return 'user';
   if (testId.includes('assistant')) return 'assistant';
+
+  // Secondary fallback checking class names
+  const className = typeof element.className === 'string' ? element.className : '';
+  if (className.includes('user')) return 'user';
+  if (className.includes('assistant') || className.includes('agent-turn')) return 'assistant';
 
   return null;
 }
@@ -88,8 +98,8 @@ export function findContentRoot(turnElement: Element): Element | null {
     }
   }
 
-  // Generic fallback if role could not be determined
-  const genericEl = turnElement.querySelector('.markdown.prose, .user-message-content, .prose');
+  // Generic fallback if role could not be determined or role-specific selector returned null
+  const genericEl = turnElement.querySelector('.markdown.prose, .user-message-content, .prose, .whitespace-pre-wrap');
   if (genericEl) return genericEl;
 
   return turnElement;

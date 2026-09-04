@@ -19,7 +19,11 @@ import {
   ExtractionMetadata,
 } from './Model';
 
+import { ExtractionResult, ExtractionStatus } from './ExtractionResult';
+import { createDiagnosticEntry, DiagnosticCode, DiagnosticEntry } from '../../utils/Diagnostics';
+
 import {
+  findConversationRoot,
   findTurnCandidates,
   getRoleFromElement,
   findContentRoot,
@@ -90,31 +94,87 @@ export function extractCleanText(contentRoot: Element): string {
  * @returns Normalized `Conversation` object.
  * @throws `ExtractionError` if extraction cannot proceed safely (e.g. streaming or host mismatch).
  */
-export function extractConversation(
+/**
+ * Extracts a normalized `Conversation` object alongside structured diagnostics and extraction status.
+ */
+export function extractConversationWithResult(
   root: Document | Element = typeof document !== 'undefined' ? document : (null as unknown as Document),
   urlPath: string = typeof window !== 'undefined' ? window.location.pathname : ''
-): Conversation {
+): ExtractionResult {
   const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'chatgpt.com';
+  const warnings: DiagnosticEntry[] = [];
+  const errors: DiagnosticEntry[] = [];
 
   if (!isSupportedHost(currentHost)) {
-    logger.warn('Extraction aborted: unsupported host host=', currentHost);
-    throw new ExtractionError(
-      'UNSUPPORTED_HOST',
-      `Host '${currentHost}' is not supported for ChatGPT conversation extraction.`
+    const err = createDiagnosticEntry(
+      'error',
+      'UNSUPPORTED_HOST' as unknown as DiagnosticCode,
+      `Host '${currentHost}' is not supported for ChatGPT conversation extraction.`,
+      { host: currentHost }
     );
+    logger.diagnostic(err);
+    return {
+      status: 'failure',
+      conversation: null,
+      warnings: [],
+      errors: [err],
+      counts: { turns: 0, user: 0, assistant: 0, unknown: 0, blocks: 0 },
+    };
   }
 
   if (isStreaming(root)) {
-    logger.info('Extraction aborted: assistant response is actively streaming.');
-    throw new ExtractionError(
-      'STREAMING_IN_PROGRESS',
-      'Conversation response is currently generating. Please wait for streaming to complete.'
+    const info = createDiagnosticEntry(
+      'info',
+      'STREAMING_IN_PROGRESS' as unknown as DiagnosticCode,
+      'Conversation response is currently generating.'
     );
+    logger.diagnostic(info);
+    return {
+      status: 'failure',
+      conversation: null,
+      warnings: [info],
+      errors: [],
+      counts: { turns: 0, user: 0, assistant: 0, unknown: 0, blocks: 0 },
+    };
   }
 
+  const conversationRoot = findConversationRoot(root);
   const turns = findTurnCandidates(root);
+
+  // Detect suspicious empty extraction vs legitimate empty
   if (turns.length === 0) {
-    logger.warn('Extraction completed with no turn candidates found.');
+    if (conversationRoot || (root && root.querySelector && root.querySelector('main'))) {
+      const warn = createDiagnosticEntry(
+        'warning',
+        'EXTRACTION_EMPTY_SUSPICIOUS',
+        'Conversation container was located, but no turn candidates could be extracted.',
+        { hasConversationRoot: Boolean(conversationRoot) }
+      );
+      warnings.push(warn);
+      logger.diagnostic(warn);
+
+      return {
+        status: 'suspicious_empty',
+        conversation: null,
+        warnings,
+        errors: [],
+        counts: { turns: 0, user: 0, assistant: 0, unknown: 0, blocks: 0 },
+      };
+    } else {
+      const info = createDiagnosticEntry(
+        'info',
+        'ADAPTER_CONTAINER_NOT_FOUND',
+        'No conversation container or turn candidates found.'
+      );
+      warnings.push(info);
+      return {
+        status: 'empty',
+        conversation: null,
+        warnings,
+        errors: [],
+        counts: { turns: 0, user: 0, assistant: 0, unknown: 0, blocks: 0 },
+      };
+    }
   }
 
   const title = getConversationTitle(root);
@@ -122,13 +182,16 @@ export function extractConversation(
   const fullUrl = typeof window !== 'undefined' ? window.location.href : `https://chatgpt.com${urlPath}`;
 
   const messages: Message[] = [];
+  let userCount = 0;
+  let assistantCount = 0;
   let unknownRoleCount = 0;
+  let totalBlocks = 0;
 
   turns.forEach((turnEl, index) => {
     const role: MessageRole = getRoleFromElement(turnEl) || 'unknown';
-    if (role === 'unknown') {
-      unknownRoleCount++;
-    }
+    if (role === 'user') userCount++;
+    else if (role === 'assistant') assistantCount++;
+    else unknownRoleCount++;
 
     const messageId = getDeterministicMessageId(turnEl, index);
     const contentRoot = findContentRoot(turnEl);
@@ -137,6 +200,16 @@ export function extractConversation(
 
     if (contentRoot) {
       blocks = extractContentBlocks(contentRoot);
+      totalBlocks += blocks.length;
+    } else {
+      const warn = createDiagnosticEntry(
+        'warning',
+        'ADAPTER_MESSAGE_NOT_FOUND',
+        `Could not locate content root for turn ${index + 1}.`,
+        { turnIndex: index + 1, role }
+      );
+      warnings.push(warn);
+      logger.diagnostic(warn);
     }
 
     messages.push({
@@ -146,18 +219,29 @@ export function extractConversation(
     });
   });
 
-  // Calculate extraction confidence
+  // Calculate extraction confidence & status
   const health = checkHealth(root);
   let confidence: 'high' | 'medium' | 'low' = 'high';
-  if (turns.length === 0 || health.confidence === 'none' || health.confidence === 'low') {
+  let status: ExtractionStatus = 'success';
+
+  if (health.confidence === 'none' || health.confidence === 'low') {
     confidence = 'low';
-  } else if (unknownRoleCount > 0 || health.confidence === 'medium') {
+    status = 'partial';
+  } else if (unknownRoleCount > 0 || health.confidence === 'medium' || warnings.length > 0) {
     confidence = 'medium';
+    status = 'partial';
   }
 
-  logger.info(
-    `Extraction successful. turns=${messages.length}, unknownRoles=${unknownRoleCount}, confidence=${confidence}`
-  );
+  if (status === 'partial') {
+    const warn = createDiagnosticEntry(
+      'warning',
+      'EXTRACTION_PARTIAL',
+      'Conversation was extracted with potential partial issues or unknown roles.',
+      { turns: messages.length, unknownRoles: unknownRoleCount, confidence }
+    );
+    warnings.push(warn);
+    logger.diagnostic(warn);
+  }
 
   const metadata: ExtractionMetadata = {
     source: 'chatgpt.com',
@@ -166,7 +250,7 @@ export function extractConversation(
     confidence,
   };
 
-  return {
+  const conversation: Conversation = {
     id: conversationId,
     title,
     url: fullUrl,
@@ -174,6 +258,44 @@ export function extractConversation(
     messages,
     metadata,
   };
+
+  return {
+    status,
+    conversation,
+    warnings,
+    errors,
+    counts: {
+      turns: messages.length,
+      user: userCount,
+      assistant: assistantCount,
+      unknown: unknownRoleCount,
+      blocks: totalBlocks,
+    },
+  };
+}
+
+/**
+ * Extracts a normalized `Conversation` object from the current ChatGPT DOM.
+ *
+ * @param root Document or Element containing the ChatGPT DOM.
+ * @param urlPath Optional current URL pathname (defaults to window.location.pathname).
+ * @returns Normalized `Conversation` object.
+ * @throws `ExtractionError` if extraction cannot proceed safely (e.g. streaming or host mismatch).
+ */
+export function extractConversation(
+  root: Document | Element = typeof document !== 'undefined' ? document : (null as unknown as Document),
+  urlPath: string = typeof window !== 'undefined' ? window.location.pathname : ''
+): Conversation {
+  const result = extractConversationWithResult(root, urlPath);
+
+  if (result.status === 'failure' || !result.conversation) {
+    const firstErr = result.errors[0] || result.warnings[0];
+    const code = firstErr ? (firstErr.code as unknown as ExtractionErrorCode) : 'CONVERSATION_NOT_FOUND';
+    const msg = firstErr ? firstErr.message : 'Failed to extract conversation content.';
+    throw new ExtractionError(code, msg);
+  }
+
+  return result.conversation;
 }
 
 /**

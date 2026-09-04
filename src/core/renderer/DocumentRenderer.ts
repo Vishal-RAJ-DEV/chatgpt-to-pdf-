@@ -276,28 +276,36 @@ function renderMath(block: MathBlock): string {
  * Render a single ContentBlock.
  */
 function renderBlock(block: ContentBlock): string {
-  switch (block.type) {
-    case 'paragraph':
-      return renderParagraph(block);
-    case 'heading':
-      return renderHeading(block);
-    case 'code':
-      return renderCode(block);
-    case 'list':
-      return renderList(block);
-    case 'quote':
-      return renderQuote(block);
-    case 'table':
-      return renderTable(block);
-    case 'image':
-      return renderImage(block);
-    case 'math':
-      return renderMath(block);
-    default: {
-      // Safe fallback for unknown block types
-      const unknownBlock = block as Record<string, unknown>;
-      return `<p class="fallback-block">${escapeHtml(JSON.stringify(unknownBlock))}</p>`;
+  if (!block || typeof block !== 'object') {
+    return '';
+  }
+
+  try {
+    switch (block.type) {
+      case 'paragraph':
+        return renderParagraph(block);
+      case 'heading':
+        return renderHeading(block);
+      case 'code':
+        return renderCode(block);
+      case 'list':
+        return renderList(block);
+      case 'quote':
+        return renderQuote(block);
+      case 'table':
+        return renderTable(block);
+      case 'image':
+        return renderImage(block);
+      case 'math':
+        return renderMath(block);
+      default: {
+        // Safe fallback for unknown block types
+        const unknownBlock = block as Record<string, unknown>;
+        return `<p class="fallback-block">${escapeHtml(JSON.stringify(unknownBlock))}</p>`;
+      }
     }
+  } catch (err) {
+    return `<p class="fallback-block">[Render Error: Unable to display block]</p>`;
   }
 }
 

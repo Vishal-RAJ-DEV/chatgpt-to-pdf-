@@ -8,6 +8,8 @@
 import { CURRENT_SETTINGS_VERSION, StoredSettings, UserSettings } from './Settings';
 import { DEFAULT_SETTINGS } from './defaults';
 import { validatePartialSettings, validateSettings } from './validation';
+import { logger } from '../../utils/logger';
+import { createDiagnosticEntry } from '../../utils/Diagnostics';
 
 export const STORAGE_KEY = 'chatgpt_pdf_exporter_settings';
 
@@ -56,12 +58,20 @@ export class SettingsManager {
    * If storage is empty or invalid, returns validated DEFAULT_SETTINGS.
    */
   public async loadSettings(): Promise<UserSettings> {
-    const storage = getStorageArea();
-    return new Promise<UserSettings>((resolve, reject) => {
+    return new Promise<UserSettings>((resolve) => {
       try {
+        const storage = getStorageArea();
         storage.get([STORAGE_KEY], (result) => {
           if (chrome.runtime && chrome.runtime.lastError) {
-            return reject(new Error(chrome.runtime.lastError.message));
+            logger.diagnostic(
+              createDiagnosticEntry(
+                'warning',
+                'SETTINGS_STORAGE_FAILED',
+                'Chrome storage load failed; falling back to DEFAULT_SETTINGS.',
+                { error: chrome.runtime.lastError.message }
+              )
+            );
+            return resolve(validateSettings(DEFAULT_SETTINGS));
           }
 
           const rawData = result ? result[STORAGE_KEY] : undefined;
@@ -73,7 +83,15 @@ export class SettingsManager {
           resolve(migrated);
         });
       } catch (err) {
-        reject(err instanceof Error ? err : new Error(String(err)));
+        logger.diagnostic(
+          createDiagnosticEntry(
+            'warning',
+            'SETTINGS_STORAGE_FAILED',
+            'Storage API exception; falling back to DEFAULT_SETTINGS.',
+            { error: err instanceof Error ? err.message : String(err) }
+          )
+        );
+        resolve(validateSettings(DEFAULT_SETTINGS));
       }
     });
   }
