@@ -1,8 +1,9 @@
 /**
- * Integration Smoke Test — Full HTML / PDF Rendered Document Correctness (Phase 10).
+ * Integration Smoke Test — Renderer HTML Document Correctness (Phase 10).
  *
  * Validates a representative multi-page, multi-block conversation through the pure renderer
- * to guarantee production-readiness, visual rules preservation, and zero text/UI leakage.
+ * in a Vitest JSDOM environment to guarantee production-readiness, visual rules preservation,
+ * and zero text/UI leakage.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -10,7 +11,7 @@ import { Conversation } from '../../src/core/conversation/Model';
 import { renderConversation } from '../../src/core/renderer/DocumentRenderer';
 import { DEFAULT_RENDER_OPTIONS } from '../../src/core/renderer/RenderTypes';
 
-describe('Full HTML / PDF Browser Smoke Test Suite', () => {
+describe('Renderer HTML Smoke Test (Vitest Simulation)', () => {
   const representativeConversation: Conversation = {
     id: 'smoke-conv-99',
     title: 'Full Technical Report & Math Reference',

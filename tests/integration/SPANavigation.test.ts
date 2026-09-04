@@ -200,4 +200,48 @@ describe('ChatGPT SPA Navigation & Stale Cache Prevention Tests', () => {
     expect(printedHtml).toContain('Chat 222');
     expect(printedHtml).not.toContain('Chat 111');
   });
+
+  it('5. Full SPA Lifecycle Harness: history.pushState / replaceState / popstate and dynamic DOM replacement', async () => {
+    // 1. Initial State A: /c/672a1b9e-4c80-8005-9f5b-aaaaa1111111
+    window.history.replaceState({ convId: 'A' }, '', '/c/672a1b9e-4c80-8005-9f5b-aaaaa1111111');
+    const docA = createTestDom({
+      title: 'Initial State A',
+      userText: 'Turn A prompt',
+      assistantText: 'Turn A response',
+    });
+
+    const resA = extractConversationWithResult(docA, window.location.pathname);
+    expect(resA.status).toBe('success');
+    expect(resA.conversation?.id).toBe('672a1b9e-4c80-8005-9f5b-aaaaa1111111');
+    expect(resA.conversation?.title).toBe('Initial State A');
+
+    // 2. Client-side route transition via pushState to B: /c/672a1b9e-4c80-8005-9f5b-bbbbb2222222
+    window.history.pushState({ convId: 'B' }, '', '/c/672a1b9e-4c80-8005-9f5b-bbbbb2222222');
+    expect(window.location.pathname).toBe('/c/672a1b9e-4c80-8005-9f5b-bbbbb2222222');
+
+    // Dynamic DOM replacement simulating React/Next SPA re-render
+    const docB = createTestDom({
+      title: 'Pushed State B',
+      userText: 'Turn B prompt',
+      assistantText: 'Turn B response',
+    });
+
+    const resB = extractConversationWithResult(docB, window.location.pathname);
+    expect(resB.status).toBe('success');
+    expect(resB.conversation?.id).toBe('672a1b9e-4c80-8005-9f5b-bbbbb2222222');
+    expect(resB.conversation?.title).toBe('Pushed State B');
+
+    // 3. Backward navigation via history pushState / popstate event simulation back to State A
+    window.history.pushState({ convId: 'A' }, '', '/c/672a1b9e-4c80-8005-9f5b-aaaaa1111111');
+    window.dispatchEvent(new PopStateEvent('popstate', { state: { convId: 'A' } }));
+    expect(window.location.pathname).toBe('/c/672a1b9e-4c80-8005-9f5b-aaaaa1111111');
+
+    // Dynamic DOM restored to State A upon popstate
+    const resA_restored = extractConversationWithResult(docA, window.location.pathname);
+    expect(resA_restored.status).toBe('success');
+    expect(resA_restored.conversation?.id).toBe('672a1b9e-4c80-8005-9f5b-aaaaa1111111');
+    expect(resA_restored.conversation?.title).toBe('Initial State A');
+  });
 });
+
+

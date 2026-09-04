@@ -1,15 +1,16 @@
 /**
- * Integration Tests — PrintService Browser Integration & Cleanup (Phase 10).
+ * Integration Tests — PrintService Contract & Mocked Lifecycle (Phase 10).
  *
  * Verifies window lifecycle management, HTML payload writing, print execution,
- * error handling, timeout handling, and window/timer cleanup guarantees.
+ * error handling, timeout handling, and window/timer cleanup guarantees using
+ * a mocked window environment in Vitest.
  */
 
 import { describe, expect, it, vi } from 'vitest';
 import { PrintService } from '../../src/core/export/PrintService';
 import { ExportError, ExportErrorCode } from '../../src/core/export/ExportErrors';
 
-describe('PrintService Browser Integration & Cleanup Tests', () => {
+describe('PrintService Contract & Mocked Lifecycle Tests (Vitest Simulation)', () => {
   function setupMockWindow(options?: {
     blockPopup?: boolean;
     readyState?: 'complete' | 'loading';
