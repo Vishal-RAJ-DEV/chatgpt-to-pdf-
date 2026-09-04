@@ -85,23 +85,74 @@ describe('Automated Release Packaging & Dist Purity Audit Tests', () => {
     }
   });
 
-  it('4. fails packaging cleanly when manifest.version is missing or invalid semver', () => {
-    // Create temporary invalid manifest
-    const invalidManifestPath = path.resolve(process.cwd(), 'temp_invalid_manifest.json');
-    fs.writeFileSync(invalidManifestPath, JSON.stringify({ name: 'Test', version: 'invalid-semver' }));
+  it('4. REGRESSION: excludes unexpected injected dev files inside scanned dist directories', () => {
+    const unexpectedAsset = path.join(distDir, 'assets', 'unexpected_dev_file.txt');
+    const unexpectedRoot = path.join(distDir, 'unexpected_root_file.tmp');
 
+    // Inject non-allowlisted files into dist
+    fs.writeFileSync(unexpectedAsset, 'DUMMY ASSET DATA');
+    fs.writeFileSync(unexpectedRoot, 'DUMMY ROOT DATA');
+
+    try {
+      // Re-run package script
+      execSync('node scripts/package.js', { stdio: 'pipe' });
+
+      // Inspect output ZIP
+      const zipBuffer = fs.readFileSync(zipPath);
+      const zipEntries = listZipEntries(zipBuffer);
+
+      // Assert non-allowlisted files were NOT included in the ZIP
+      const hasUnexpectedAsset = zipEntries.some((e) => e.includes('unexpected_dev_file.txt'));
+      const hasUnexpectedRoot = zipEntries.some((e) => e.includes('unexpected_root_file.tmp'));
+
+      expect(hasUnexpectedAsset).toBe(false);
+      expect(hasUnexpectedRoot).toBe(false);
+    } finally {
+      // Clean up injected test files from dist/
+      if (fs.existsSync(unexpectedAsset)) fs.unlinkSync(unexpectedAsset);
+      if (fs.existsSync(unexpectedRoot)) fs.unlinkSync(unexpectedRoot);
+    }
+  });
+
+  it('5. strictly rejects packaging when manifest.version is invalid semver format', () => {
+    const invalidManifestPath = path.resolve(process.cwd(), 'temp_invalid_semver_manifest.json');
+    fs.writeFileSync(invalidManifestPath, JSON.stringify({ name: 'Test Extension', version: 'invalid-semver-string' }));
+
+    let scriptThrew = false;
     try {
       execSync('node scripts/package.js', {
         env: { ...process.env, MANIFEST_PATH: invalidManifestPath },
         stdio: 'pipe',
       });
-    } catch (err: unknown) {
-      const errorStr = String(err);
-      expect(errorStr).toBeDefined();
+    } catch (err: any) {
+      scriptThrew = true;
+      const output = (err.stderr?.toString() || '') + (err.stdout?.toString() || '') + String(err);
+      expect(output).toContain('Invalid or missing manifest.version');
     } finally {
-      if (fs.existsSync(invalidManifestPath)) {
-        fs.unlinkSync(invalidManifestPath);
-      }
+      if (fs.existsSync(invalidManifestPath)) fs.unlinkSync(invalidManifestPath);
     }
+
+    expect(scriptThrew).toBe(true);
+  });
+
+  it('6. strictly rejects packaging when manifest.version is completely missing', () => {
+    const missingManifestPath = path.resolve(process.cwd(), 'temp_missing_version_manifest.json');
+    fs.writeFileSync(missingManifestPath, JSON.stringify({ name: 'Test Extension' }));
+
+    let scriptThrew = false;
+    try {
+      execSync('node scripts/package.js', {
+        env: { ...process.env, MANIFEST_PATH: missingManifestPath },
+        stdio: 'pipe',
+      });
+    } catch (err: any) {
+      scriptThrew = true;
+      const output = (err.stderr?.toString() || '') + (err.stdout?.toString() || '') + String(err);
+      expect(output).toContain('Invalid or missing manifest.version');
+    } finally {
+      if (fs.existsSync(missingManifestPath)) fs.unlinkSync(missingManifestPath);
+    }
+
+    expect(scriptThrew).toBe(true);
   });
 });

@@ -14,7 +14,14 @@ if (!fs.existsSync(manifestPath)) {
   process.exit(1);
 }
 
-const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+let manifest;
+try {
+  manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+} catch (err) {
+  console.error('[Package] Error: Failed to parse manifest.json as JSON.');
+  process.exit(1);
+}
+
 const version = manifest.version;
 
 if (!version || typeof version !== 'string' || !/^\d+\.\d+\.\d+(?:\.\d+)?$/.test(version.trim())) {
@@ -25,6 +32,7 @@ if (!version || typeof version !== 'string' || !/^\d+\.\d+\.\d+(?:\.\d+)?$/.test
 const distDir = path.join(projectRoot, 'dist');
 const zipFileName = `chatgpt-pdf-exporter-v${version.trim()}.zip`;
 const zipPath = path.join(distDir, zipFileName);
+const stagingDir = path.join(projectRoot, '.temp_release_stage');
 
 console.log(`[Package] Creating automated cross-platform release package: ${zipFileName}...`);
 
@@ -67,47 +75,58 @@ function getProductionFilesRecursively(dir, baseDir = dir) {
       files = files.concat(getProductionFilesRecursively(fullPath, baseDir));
     } else {
       if (isProductionArtifact(relativePath)) {
-        files.push(fullPath);
+        files.push({ fullPath, relativePath });
       }
     }
   }
   return files;
 }
 
-const filesToZip = getProductionFilesRecursively(distDir);
-if (filesToZip.length === 0) {
+const allowlistedFiles = getProductionFilesRecursively(distDir);
+if (allowlistedFiles.length === 0) {
   console.error('[Package] Error: No production allow-list files found in dist/.');
   process.exit(1);
 }
 
-const relativeFilesToZip = filesToZip.map((f) => path.relative(distDir, f));
+try {
+  // Clear staging directory if present
+  if (fs.existsSync(stagingDir)) {
+    fs.rmSync(stagingDir, { recursive: true, force: true });
+  }
+  fs.mkdirSync(stagingDir, { recursive: true });
 
-// Top-level allowable items to preserve folder hierarchy in ZIP
-const topLevelItems = Array.from(
-  new Set(relativeFilesToZip.map((f) => f.split(path.sep)[0]))
-);
+  // Copy ONLY allow-listed files into staging directory preserving relative paths
+  for (const file of allowlistedFiles) {
+    const destPath = path.join(stagingDir, file.relativePath);
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+    fs.copyFileSync(file.fullPath, destPath);
+  }
 
-// Create ZIP using platform tool
-const isWindows = process.platform === 'win32';
-if (isWindows) {
-  const formattedFileList = topLevelItems.map((f) => `'${f}'`).join(',');
-  const psCommand = `powershell -Command "Set-Location -Path '${distDir}'; Compress-Archive -Path ${formattedFileList} -DestinationPath '${zipPath}' -Force"`;
-  execSync(psCommand, { stdio: 'inherit' });
-} else {
-  const formattedFileList = topLevelItems.map((f) => `"${f}"`).join(' ');
-  execSync(`cd "${distDir}" && zip -r "${zipPath}" ${formattedFileList} -x "*.zip"`, { stdio: 'inherit' });
-}
+  // Create ZIP from staging directory
+  const isWindows = process.platform === 'win32';
+  if (isWindows) {
+    const psCommand = `powershell -Command "Set-Location -Path '${stagingDir}'; Compress-Archive -Path * -DestinationPath '${zipPath}' -Force"`;
+    execSync(psCommand, { stdio: 'inherit' });
+  } else {
+    execSync(`cd "${stagingDir}" && zip -r "${zipPath}" .`, { stdio: 'inherit' });
+  }
 
-if (fs.existsSync(zipPath)) {
-  const stats = fs.statSync(zipPath);
-  const sizeKb = (stats.size / 1024).toFixed(2);
-  console.log(`[Package] Release package created successfully!`);
-  console.log(`  Path: ${zipPath}`);
-  console.log(`  Size: ${sizeKb} KB`);
-  console.log(`  Version: v${version}`);
-  console.log(`  Files Packaged (${relativeFilesToZip.length}):`);
-  relativeFilesToZip.forEach((f) => console.log(`    - ${f}`));
-} else {
-  console.error('[Package] Error: Failed to create zip package.');
-  process.exit(1);
+  if (fs.existsSync(zipPath)) {
+    const stats = fs.statSync(zipPath);
+    const sizeKb = (stats.size / 1024).toFixed(2);
+    console.log(`[Package] Release package created successfully!`);
+    console.log(`  Path: ${zipPath}`);
+    console.log(`  Size: ${sizeKb} KB`);
+    console.log(`  Version: v${version}`);
+    console.log(`  Files Packaged (${allowlistedFiles.length}):`);
+    allowlistedFiles.forEach((f) => console.log(`    - ${f.relativePath}`));
+  } else {
+    console.error('[Package] Error: Failed to create zip package.');
+    process.exit(1);
+  }
+} finally {
+  // Clean up staging directory
+  if (fs.existsSync(stagingDir)) {
+    fs.rmSync(stagingDir, { recursive: true, force: true });
+  }
 }
