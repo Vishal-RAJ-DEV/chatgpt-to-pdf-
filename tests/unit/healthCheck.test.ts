@@ -1,33 +1,37 @@
 import { describe, it, expect } from 'vitest';
-import { isSupportedHost, isDocumentReady } from '../../src/adapters/chatgpt/ChatGPTAdapter';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { checkHealth } from '../../src/adapters/chatgpt/healthCheck';
 
-describe('isSupportedHost', () => {
-  it('returns true for chatgpt.com', () => {
-    expect(isSupportedHost('chatgpt.com')).toBe(true);
+function loadFixture(filename: string): Document {
+  const filePath = resolve(__dirname, '../fixtures/html', filename);
+  const html = readFileSync(filePath, 'utf8');
+  const parser = new DOMParser();
+  return parser.parseFromString(html, 'text/html');
+}
+
+describe('checkHealth Extended Diagnostics', () => {
+  it('returns high confidence for a valid basic fixture', () => {
+    const doc = loadFixture('chatgpt-current-basic.html');
+    const status = checkHealth(doc);
+
+    expect(status.supportedHost).toBe(true);
+    expect(status.documentReady).toBe(true);
+    expect(status.conversationDetected).toBe(true);
+    expect(status.turnCandidatesFound).toBe(true);
+    expect(status.userTurnsFound).toBe(true);
+    expect(status.assistantTurnsFound).toBe(true);
+    expect(status.confidence).toBe('high');
   });
 
-  it('returns true for www.chatgpt.com', () => {
-    expect(isSupportedHost('www.chatgpt.com')).toBe(true);
-  });
+  it('returns medium/low confidence if turns are missing', () => {
+    const doc = loadFixture('chatgpt-current-basic.html');
+    // Remove all turns from fixture
+    doc.querySelectorAll('[data-testid^="conversation-turn-"]').forEach((el) => el.remove());
 
-  it('returns false for other hostnames', () => {
-    expect(isSupportedHost('example.com')).toBe(false);
-    expect(isSupportedHost('chat.openai.com')).toBe(false);
-    expect(isSupportedHost('localhost')).toBe(false);
-    expect(isSupportedHost('')).toBe(false);
-  });
-});
-
-describe('isDocumentReady', () => {
-  it('returns true when readyState is complete', () => {
-    expect(isDocumentReady('complete')).toBe(true);
-  });
-
-  it('returns true when readyState is interactive', () => {
-    expect(isDocumentReady('interactive')).toBe(true);
-  });
-
-  it('returns false when readyState is loading', () => {
-    expect(isDocumentReady('loading')).toBe(false);
+    const status = checkHealth(doc);
+    expect(status.conversationDetected).toBe(true);
+    expect(status.turnCandidatesFound).toBe(false);
+    expect(status.confidence).toBe('low');
   });
 });

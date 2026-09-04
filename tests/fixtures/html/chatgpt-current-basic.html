@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Basic ChatGPT Conversation - ChatGPT</title>
+</head>
+<body>
+  <div id="__next">
+    <main class="relative h-full w-full flex-1 overflow-hidden transition-width">
+      <div class="flex h-full flex-col" data-testid="conversation-turns-container">
+        <!-- Turn 1: User -->
+        <article data-testid="conversation-turn-1" data-message-author-role="user" class="w-full text-token-text-primary">
+          <div class="py-2 flex m-auto text-base gap-4 md:gap-6 md:max-w-2xl lg:max-w-xl xl:max-w-3xl">
+            <div class="relative flex w-full min-w-0 flex-col">
+              <div class="user-message-content whitespace-pre-wrap">How do I write a Hello World in Python?</div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Turn 2: Assistant -->
+        <article data-testid="conversation-turn-2" data-message-author-role="assistant" class="w-full text-token-text-primary">
+          <div class="py-2 flex m-auto text-base gap-4 md:gap-6 md:max-w-2xl lg:max-w-xl xl:max-w-3xl">
+            <div class="relative flex w-full min-w-0 flex-col">
+              <div class="agent-turn">
+                <div class="markdown prose w-full break-words dark:prose-invert light">
+                  <p>Here is how you write a Hello World program in Python:</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

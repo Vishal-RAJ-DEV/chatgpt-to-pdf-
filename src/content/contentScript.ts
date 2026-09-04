@@ -1,9 +1,8 @@
 /**
- * Content Script — Phase 1 entry point.
+ * Content Script — Phase 2 entry point.
  *
  * Injected on https://chatgpt.com/* by the Chrome extension manifest.
- * At this phase it only performs diagnostic logging to prove the
- * extension is loaded and running.
+ * Performs diagnostic logging and DOM health check reporting.
  */
 
 import { logger } from '../utils/logger';
@@ -15,6 +14,11 @@ function main(): void {
   const health = checkHealth();
   logger.info('Host supported:', health.supportedHost);
   logger.info('Document ready:', health.documentReady);
+  logger.info('Conversation detected:', health.conversationDetected);
+  logger.info('Turns found:', health.turnCandidatesFound);
+  logger.info('User turns found:', health.userTurnsFound);
+  logger.info('Assistant turns found:', health.assistantTurnsFound);
+  logger.info('DOM Health confidence:', health.confidence);
 }
 
 main();
