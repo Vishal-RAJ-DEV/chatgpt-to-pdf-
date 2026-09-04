@@ -1,12 +1,12 @@
 /**
- * Plain ChatGPT Conversation Extractor — Phase 3B.
+ * ChatGPT Conversation Extractor — Phase 3C.
  *
- * Consumes DOM structures discovered by `ChatGPTAdapter` and transforms them into a pure
- * normalized `Conversation` domain model object.
+ * Consumes DOM structures discovered by `ChatGPTAdapter` and delegates content parsing to
+ * `RichContentExtractor` to build normalized `Conversation` domain model objects.
  *
  * Strict Architectural Rules:
  *   - Does NOT contain hardcoded ChatGPT CSS/data-attribute selectors.
- *   - Relies strictly on `ChatGPTAdapter` discovery methods.
+ *   - Relies strictly on `ChatGPTAdapter` discovery methods and `RichContentExtractor`.
  *   - NEVER logs private user prompt text or assistant responses.
  *   - Implements deterministic message IDs (no Math.random()).
  */
@@ -15,7 +15,7 @@ import {
   Conversation,
   Message,
   MessageRole,
-  ParagraphBlock,
+  ContentBlock,
   ExtractionMetadata,
 } from './Model';
 
@@ -31,6 +31,7 @@ import {
 
 import { checkHealth } from '../../adapters/chatgpt/healthCheck';
 import { logger } from '../../utils/logger';
+import { extractContentBlocks, normalizeText } from './RichContentExtractor';
 
 export type ExtractionErrorCode =
   | 'UNSUPPORTED_HOST'
@@ -51,19 +52,7 @@ export class ExtractionError extends Error {
   }
 }
 
-/**
- * Normalizes text content:
- *   - Normalizes CRLF/CR to LF (\n).
- *   - Trims outer whitespace.
- *   - Collapses 3+ consecutive newlines down to 2 (\n\n) while preserving multiline formatting.
- */
-export function normalizeText(text: string): string {
-  if (!text) return '';
-  const lines = text.replace(/\r\n|\r/g, '\n').split('\n');
-  const trimmedLines = lines.map((line) => line.trim());
-  const joined = trimmedLines.join('\n').trim();
-  return joined.replace(/\n{3,}/g, '\n\n');
-}
+export { normalizeText };
 
 /**
  * Derives a deterministic message ID for a turn element.
@@ -83,29 +72,12 @@ export function getDeterministicMessageId(turnElement: Element, index: number): 
 }
 
 /**
- * Extracts plain text from a content root element while excluding UI control text
- * (such as "Copy code" buttons, edit prompt labels, or toolbar elements).
+ * Helper re-export for plain clean text extraction from a content root element.
  */
 export function extractCleanText(contentRoot: Element): string {
   if (!contentRoot) return '';
-
-  // Clone node so DOM mutations do not affect live page
-  const clone = contentRoot.cloneNode(true) as Element;
-
-  // Remove UI control elements from cloned subtree
-  const uiSelectors = [
-    'button',
-    '.copy-code-button',
-    '[aria-label*="Copy"]',
-    '[aria-label*="Edit"]',
-    '.flex.items-center.justify-between',
-  ];
-
-  uiSelectors.forEach((sel) => {
-    clone.querySelectorAll(sel).forEach((el) => el.remove());
-  });
-
-  return normalizeText(clone.textContent || '');
+  const blocks = extractContentBlocks(contentRoot);
+  return blocks.map((b) => ('text' in b ? (b as { text: string }).text : '')).filter(Boolean).join('\n');
 }
 
 /**
@@ -159,16 +131,10 @@ export function extractConversation(
     const messageId = getDeterministicMessageId(turnEl, index);
     const contentRoot = findContentRoot(turnEl);
 
-    const blocks: ParagraphBlock[] = [];
+    let blocks: ContentBlock[] = [];
 
     if (contentRoot) {
-      const cleanText = extractCleanText(contentRoot);
-      if (cleanText.length > 0) {
-        blocks.push({
-          type: 'paragraph',
-          text: cleanText,
-        });
-      }
+      blocks = extractContentBlocks(contentRoot);
     }
 
     messages.push({

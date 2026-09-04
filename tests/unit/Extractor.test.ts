@@ -17,14 +17,14 @@ function loadFixture(filename: string): Document {
 }
 
 describe('Extractor Helper Functions', () => {
-  it('normalizeText trims whitespace and collapses 3+ newlines down to 2', () => {
-    const raw = '  Hello \r\n\r\n\r\n\r\n World!  ';
+  it('normalizeText trims outer leading/trailing newlines and collapses 3+ newlines down to 2', () => {
+    const raw = 'Hello \r\n\r\n\r\n\r\nWorld!';
     expect(normalizeText(raw)).toBe('Hello\n\nWorld!');
   });
 
-  it('normalizeText preserves single newlines in multiline text', () => {
-    const multiline = 'Line 1\nLine 2\nLine 3';
-    expect(normalizeText(multiline)).toBe('Line 1\nLine 2\nLine 3');
+  it('normalizeText preserves single newlines and leading indentation', () => {
+    const multiline = 'Line 1\n  Line 2 indented';
+    expect(normalizeText(multiline)).toBe('Line 1\n  Line 2 indented');
   });
 
   it('getDeterministicMessageId uses data-message-id, data-testid, or index fallback', () => {
@@ -89,7 +89,7 @@ describe('extractConversation UI Text Leaks Prevention', () => {
   it('does not leak "Copy code" button text into assistant paragraph block', () => {
     const conversation = extractConversation(doc, '/c/test');
     const assistantMsg = conversation.messages[1];
-    const blockText = (assistantMsg.blocks[0] as { text: string }).text;
+    const blockText = (assistantMsg.blocks[0] as { text?: string }).text || (assistantMsg.blocks[0] as { code?: string }).code;
 
     expect(blockText).not.toContain('Copy code');
   });
