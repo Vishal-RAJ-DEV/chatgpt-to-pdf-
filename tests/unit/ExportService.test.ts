@@ -251,6 +251,68 @@ describe('ExportService Orchestrator Unit Tests', () => {
     const result = await service.exportCurrentTab();
 
     expect(result.success).toBe(true);
+    expect(result.state).toBe('warning');
+    expect(result.extractionStatus).toBe('partial');
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings?.[0].code).toBe('ADAPTER_MESSAGE_NOT_FOUND');
+    expect(mockPrintService.print).toHaveBeenCalled();
+  });
+
+  it('17. clean success has extractionStatus="success", state="success", and empty warnings array', async () => {
+    mockCommunicator.sendMessage = vi.fn().mockResolvedValue({
+      success: true,
+      result: {
+        status: 'success',
+        conversation: sampleConversation,
+        warnings: [],
+        errors: [],
+        counts: { turns: 2, user: 1, assistant: 1, unknown: 0, blocks: 2 },
+      },
+    });
+    const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
+    const result = await service.exportCurrentTab();
+
+    expect(result.success).toBe(true);
+    expect(result.state).toBe('success');
+    expect(result.extractionStatus).toBe('success');
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('18. null conversation without positive evidence does NOT fabricate a conversation and blocks export', async () => {
+    mockCommunicator.sendMessage = vi.fn().mockResolvedValue({
+      success: false,
+      status: 'empty',
+      conversation: null,
+    });
+    const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
+    const result = await service.exportCurrentTab();
+
+    expect(result.success).toBe(false);
+    expect(result.errorCode).toBe(ExportErrorCode.EXTRACTION_FAILED);
+    expect(mockPrintService.print).not.toHaveBeenCalled();
+  });
+
+  it('19. legitimate empty conversation with positive evidence and real conversation object exports cleanly', async () => {
+    const emptyConv: Conversation = {
+      id: '12345',
+      title: 'Empty Chat',
+      url: 'https://chatgpt.com/c/12345',
+      messages: [],
+    };
+    mockCommunicator.sendMessage = vi.fn().mockResolvedValue({
+      success: true,
+      result: {
+        status: 'empty',
+        conversation: emptyConv,
+        warnings: [],
+        errors: [],
+        counts: { turns: 0, user: 0, assistant: 0, unknown: 0, blocks: 0 },
+      },
+    });
+    const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
+    const result = await service.exportCurrentTab();
+
+    expect(result.success).toBe(true);
     expect(mockPrintService.print).toHaveBeenCalled();
   });
 });

@@ -140,9 +140,41 @@ export function extractConversationWithResult(
 
   const conversationRoot = findConversationRoot(root);
   const turns = findTurnCandidates(root);
+  const title = getConversationTitle(root);
+  const conversationId = getConversationId(urlPath);
+  const fullUrl = typeof window !== 'undefined' ? window.location.href : `https://chatgpt.com${urlPath}`;
 
   // Detect suspicious empty extraction vs legitimate empty
   if (turns.length === 0) {
+    const hasPositiveEvidence =
+      Boolean(conversationRoot) &&
+      (Boolean(conversationId) || (title !== 'ChatGPT Conversation' && title !== 'ChatGPT'));
+
+    if (hasPositiveEvidence) {
+      const metadata: ExtractionMetadata = {
+        source: 'chatgpt.com',
+        extractedAt: new Date().toISOString(),
+        adapterVersion: '0.1.0',
+        confidence: 'high',
+        completeness: 'complete',
+      };
+      const conversation: Conversation = {
+        id: conversationId,
+        title,
+        url: fullUrl,
+        createdAt: new Date().toISOString(),
+        messages: [],
+        metadata,
+      };
+      return {
+        status: 'empty',
+        conversation,
+        warnings,
+        errors: [],
+        counts: { turns: 0, user: 0, assistant: 0, unknown: 0, blocks: 0 },
+      };
+    }
+
     if (conversationRoot || (root && root.querySelector && root.querySelector('main'))) {
       const warn = createDiagnosticEntry(
         'warning',
@@ -161,25 +193,21 @@ export function extractConversationWithResult(
         counts: { turns: 0, user: 0, assistant: 0, unknown: 0, blocks: 0 },
       };
     } else {
-      const info = createDiagnosticEntry(
-        'info',
-        'ADAPTER_CONTAINER_NOT_FOUND',
+      const err = createDiagnosticEntry(
+        'error',
+        'CONVERSATION_NOT_FOUND',
         'No conversation container or turn candidates found.'
       );
-      warnings.push(info);
+      errors.push(err);
       return {
-        status: 'empty',
+        status: 'failure',
         conversation: null,
         warnings,
-        errors: [],
+        errors,
         counts: { turns: 0, user: 0, assistant: 0, unknown: 0, blocks: 0 },
       };
     }
   }
-
-  const title = getConversationTitle(root);
-  const conversationId = getConversationId(urlPath);
-  const fullUrl = typeof window !== 'undefined' ? window.location.href : `https://chatgpt.com${urlPath}`;
 
   const messages: Message[] = [];
   let userCount = 0;
@@ -318,38 +346,76 @@ export async function extractConversationWithResultAsync(
   urlPath: string = typeof window !== 'undefined' ? window.location.pathname : ''
 ): Promise<ExtractionResult> {
   const syncResult = extractConversationWithResult(root, urlPath);
-  if (syncResult.status === 'success' || syncResult.status === 'suspicious_empty' || syncResult.status === 'empty') {
+
+  if (syncResult.status === 'success' || syncResult.status === 'empty') {
     return syncResult;
   }
+
   try {
     const { LongConversationExtractor } = await import('./LongConversationExtractor');
     const extractor = new LongConversationExtractor();
     const conversation = await extractor.extractLongConversation(root, urlPath);
+
+    if (conversation && conversation.metadata?.completeness === 'complete') {
+      return {
+        status: 'success',
+        conversation,
+        warnings: [], // Superseded partial warnings cleared upon verified full recovery
+        errors: [],
+        counts: {
+          turns: conversation.messages.length,
+          user: conversation.messages.filter((m) => m.role === 'user').length,
+          assistant: conversation.messages.filter((m) => m.role === 'assistant').length,
+          unknown: conversation.messages.filter((m) => m.role !== 'user' && m.role !== 'assistant').length,
+          blocks: conversation.messages.reduce((acc, m) => acc + m.blocks.length, 0),
+        },
+      };
+    }
+
     return {
-      status: 'success',
+      status: 'partial',
       conversation,
       warnings: syncResult.warnings,
-      errors: [],
+      errors: syncResult.errors,
       counts: {
-        turns: conversation.messages.length,
-        user: conversation.messages.filter((m) => m.role === 'user').length,
-        assistant: conversation.messages.filter((m) => m.role === 'assistant').length,
-        unknown: conversation.messages.filter((m) => m.role !== 'user' && m.role !== 'assistant').length,
-        blocks: conversation.messages.reduce((acc, m) => acc + m.blocks.length, 0),
+        turns: conversation?.messages.length || 0,
+        user: conversation?.messages.filter((m) => m.role === 'user').length || 0,
+        assistant: conversation?.messages.filter((m) => m.role === 'assistant').length || 0,
+        unknown: conversation?.messages.filter((m) => m.role !== 'user' && m.role !== 'assistant').length || 0,
+        blocks: conversation?.messages.reduce((acc, m) => acc + m.blocks.length, 0) || 0,
       },
     };
   } catch (err) {
     if (err instanceof ExtractionError) {
+      const longErrEntry = createDiagnosticEntry(
+        'warning',
+        err.code as DiagnosticCode,
+        err.message
+      );
+
+      const preservedWarnings = [...syncResult.warnings, longErrEntry];
+
+      if (syncResult.conversation && syncResult.conversation.messages.length > 0) {
+        return {
+          status: 'partial',
+          conversation: syncResult.conversation,
+          warnings: preservedWarnings,
+          errors: syncResult.errors,
+          counts: syncResult.counts,
+        };
+      }
+
       return {
         status: 'failure',
         conversation: null,
-        warnings: syncResult.warnings,
+        warnings: preservedWarnings,
         errors: [
           createDiagnosticEntry(
             'error',
             err.code as DiagnosticCode,
             err.message
           ),
+          ...syncResult.errors,
         ],
         counts: { turns: 0, user: 0, assistant: 0, unknown: 0, blocks: 0 },
       };

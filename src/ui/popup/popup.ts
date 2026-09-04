@@ -29,7 +29,7 @@ export class PopupUI {
     badge.className = `badge badge-${type}`;
   }
 
-  public showStatus(message: string, type: 'info' | 'success' | 'error'): void {
+  public showStatus(message: string, type: 'info' | 'success' | 'warn' | 'error'): void {
     const statusBox = this.getElement<HTMLDivElement>('status-box');
     if (!statusBox) return;
     statusBox.textContent = message;
@@ -115,16 +115,23 @@ export class PopupUI {
       });
 
       if (result.success) {
-        this.showStatus(
-          'Print dialog opened. Select "Save as PDF" to save your document.',
-          'success'
-        );
+        if (result.state === 'warning') {
+          this.showStatus(
+            'PDF exported with warnings: some conversation content may be incomplete.',
+            'warn'
+          );
+        } else {
+          this.showStatus(
+            'PDF exported successfully.',
+            'success'
+          );
+        }
       } else {
-        const errorMsg = result.errorUserMessage || 'Export failed. Please try again.';
+        const errorMsg = result.errorUserMessage || 'PDF export failed.';
         this.showStatus(errorMsg, 'error');
       }
     } catch {
-      this.showStatus('Export failed unexpectedly. Please try again.', 'error');
+      this.showStatus('PDF export failed.', 'error');
     } finally {
       if (exportBtn) exportBtn.disabled = false;
     }

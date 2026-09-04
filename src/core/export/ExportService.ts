@@ -257,23 +257,22 @@ export class ExportService {
       let conversation = response.result?.conversation || response.conversation;
 
       if (!conversation) {
-        if (status === 'empty') {
-          conversation = {
-            id: null,
-            title: 'ChatGPT Conversation',
-            url: activeTab.url || 'https://chatgpt.com',
-            createdAt: new Date().toISOString(),
-            messages: [],
-            metadata: {
-              source: 'chatgpt.com',
-              extractedAt: new Date().toISOString(),
-              adapterVersion: '0.1.0',
-              confidence: 'high',
-            },
-          };
-        } else {
-          throw new ExportError(ExportErrorCode.EXTRACTION_FAILED, response?.error);
+        const rawStatus = (status as string) || '';
+        if (
+          rawStatus === 'suspicious_empty' ||
+          response?.code === ExportErrorCode.EXTRACTION_EMPTY_SUSPICIOUS ||
+          response?.code === 'EXTRACTION_EMPTY_SUSPICIOUS'
+        ) {
+          throw new ExportError(ExportErrorCode.EXTRACTION_EMPTY_SUSPICIOUS);
         }
+        if (
+          rawStatus === 'failure' ||
+          response?.code === ExportErrorCode.CONVERSATION_NOT_FOUND ||
+          response?.code === 'CONVERSATION_NOT_FOUND'
+        ) {
+          throw new ExportError(ExportErrorCode.CONVERSATION_NOT_FOUND);
+        }
+        throw new ExportError(ExportErrorCode.EXTRACTION_FAILED, response?.error);
       }
 
       // ── Stage 3: Settings Loading & Rendering ──────────────────────────────
@@ -298,10 +297,18 @@ export class ExportService {
         throw asPrintError(err);
       }
 
-      notifyState('success');
+      const isPartial = status === 'partial';
+      const finalState: ExportState = isPartial ? 'warning' : 'success';
+      const warnings = isPartial
+        ? (response?.result?.warnings || response?.warnings || [])
+        : [];
+
+      notifyState(finalState);
       return {
         success: true,
-        state: 'success',
+        state: finalState,
+        extractionStatus: status || (isPartial ? 'partial' : 'success'),
+        warnings: Array.from(warnings),
         timestamp: new Date().toISOString(),
       };
     } catch (err) {

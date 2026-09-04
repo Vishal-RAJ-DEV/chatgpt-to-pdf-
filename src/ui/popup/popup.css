@@ -153,3 +153,10 @@ body {
   color: var(--info-text);
   border: 1px solid #bae6fd;
 }
+
+.status-box.warn {
+  display: block;
+  background-color: var(--warn-bg);
+  color: var(--warn-text);
+  border: 1px solid #fde68a;
+}

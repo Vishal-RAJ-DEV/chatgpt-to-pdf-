@@ -3,6 +3,8 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import {
   extractConversation,
+  extractConversationWithResult,
+  extractConversationWithResultAsync,
   normalizeText,
   getDeterministicMessageId,
   extractCleanText,
@@ -133,5 +135,43 @@ describe('Empty & Unknown Role Message Handling', () => {
     const conversation = extractConversation(doc, '/c/test');
     expect(conversation.messages[0].role).toBe('unknown');
     expect(conversation.metadata?.confidence).toBe('medium');
+  });
+});
+
+describe('Phase 9 Empty State Policies & Evidence Requirements', () => {
+  it('identifies legitimate empty conversation when positive evidence (URL pathname ID) is present', () => {
+    const doc = document.implementation.createHTMLDocument('ChatGPT');
+    const container = doc.createElement('div');
+    container.setAttribute('data-testid', 'conversation-turns-container');
+    doc.body.appendChild(container);
+
+    const result = extractConversationWithResult(doc, '/c/672a1b9e-4c80-8005-9f5b-123456789abc');
+
+    expect(result.status).toBe('empty');
+    expect(result.conversation).not.toBeNull();
+    expect(result.conversation?.id).toBe('672a1b9e-4c80-8005-9f5b-123456789abc');
+    expect(result.conversation?.messages).toHaveLength(0);
+  });
+
+  it('treats 0 turns without positive evidence as suspicious_empty', () => {
+    const doc = document.implementation.createHTMLDocument('ChatGPT');
+    const container = doc.createElement('div');
+    container.setAttribute('data-testid', 'conversation-turns-container');
+    doc.body.appendChild(container);
+
+    const result = extractConversationWithResult(doc, '/');
+
+    expect(result.status).toBe('suspicious_empty');
+    expect(result.conversation).toBeNull();
+    expect(result.warnings.some((w: any) => w.code === 'EXTRACTION_EMPTY_SUSPICIOUS')).toBe(true);
+  });
+});
+
+describe('Phase 9 Long Conversation Recovery Semantics', () => {
+  it('verified complete long extraction clears superseded partial warnings and returns status success', async () => {
+    const doc = loadFixture('chatgpt-current-basic.html');
+    const result = await extractConversationWithResultAsync(doc, '/c/672a1b9e-4c80-8005-9f5b-123456789abc');
+    expect(result.status).toBe('success');
+    expect(result.warnings).toEqual([]);
   });
 });
