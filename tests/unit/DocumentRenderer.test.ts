@@ -252,4 +252,14 @@ describe('DocumentRenderer Core Functionality', () => {
     expect(renderConversation).toBeDefined();
     expect(DEFAULT_RENDER_OPTIONS).toBeDefined();
   });
+
+  it('23. verifies Phase 8A design tokens and CSS styles integration', () => {
+    const html = renderConversation(sampleConversation);
+    expect(html).toContain('/* ── Reset & Base Geometry ─────────────────────────────────────────── */');
+    expect(html).toContain('.message-user {');
+    expect(html).toContain('.message-assistant {');
+    expect(html).toContain('white-space: pre-wrap;');
+    expect(html).toContain('word-break: break-all;');
+    expect(html).toContain('border-collapse: collapse;');
+  });
 });

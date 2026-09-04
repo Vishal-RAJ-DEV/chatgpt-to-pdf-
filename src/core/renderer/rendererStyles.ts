@@ -1,37 +1,46 @@
 /**
- * Document Renderer CSS Styles — Phase 4.
+ * Document Renderer CSS Styles — Phase 8A Professional PDF Visual Design System.
  *
- * Generates print-ready, document-oriented CSS for printable HTML output.
+ * Generates print-ready, technical-report-oriented CSS for printable HTML output
+ * based on centralized design tokens and user RenderOptions.
  */
 
 import { RenderOptions } from './RenderTypes';
+import { DEFAULT_DESIGN_TOKENS } from './tokens';
 
 /**
- * Generate standalone CSS rules based on rendering options.
+ * Generate standalone CSS rules based on rendering options and design tokens.
  */
 export function generateDocumentStyles(options: RenderOptions): string {
+  const tokens = DEFAULT_DESIGN_TOKENS;
+
   const isA4 = options.pageSize === 'A4';
   const pageDimensions = isA4
     ? options.orientation === 'landscape'
-      ? '297mm 210mm'
-      : '210mm 297mm'
+      ? `${tokens.document.pageSizeA4Height} ${tokens.document.pageSizeA4Width}`
+      : `${tokens.document.pageSizeA4Width} ${tokens.document.pageSizeA4Height}`
     : options.orientation === 'landscape'
-    ? '11in 8.5in'
-    : '8.5in 11in';
+    ? `${tokens.document.pageSizeLetterHeight} ${tokens.document.pageSizeLetterWidth}`
+    : `${tokens.document.pageSizeLetterWidth} ${tokens.document.pageSizeLetterHeight}`;
 
   const isDarkCode = options.codeTheme === 'dark';
-  const codeBg = isDarkCode ? '#1e1e1e' : '#f8fafc';
-  const codeText = isDarkCode ? '#d4d4d4' : '#0f172a';
-  const codeBorder = isDarkCode ? '#333333' : '#e2e8f0';
+  const codeBg = isDarkCode ? tokens.colors.codeDarkBg : tokens.colors.codeLightBg;
+  const codeText = isDarkCode ? tokens.colors.codeDarkText : tokens.colors.codeLightText;
+  const codeBorder = isDarkCode ? tokens.colors.codeDarkBorder : tokens.colors.codeLightBorder;
+  const codeHeaderBg = isDarkCode ? tokens.colors.codeDarkHeaderBg : tokens.colors.codeLightHeaderBg;
+
+  const userFontFamily = options.fontFamily || tokens.typography.fontFamilyBody;
+  const userBaseFontSize = options.baseFontSize || tokens.typography.sizeBody;
+  const userLineHeight = options.lineHeight || tokens.typography.lineHeightBody;
 
   return `
-    /* Reset & Base Geometry */
+    /* ── Reset & Base Geometry ─────────────────────────────────────────── */
     @page {
       size: ${pageDimensions};
-      margin-top: ${options.marginTop};
-      margin-right: ${options.marginRight};
-      margin-bottom: ${options.marginBottom};
-      margin-left: ${options.marginLeft};
+      margin-top: ${options.marginTop || tokens.document.defaultMarginTop};
+      margin-right: ${options.marginRight || tokens.document.defaultMarginRight};
+      margin-bottom: ${options.marginBottom || tokens.document.defaultMarginBottom};
+      margin-left: ${options.marginLeft || tokens.document.defaultMarginLeft};
       @bottom-right {
         content: ${options.showFooterPageNumbers ? 'counter(page)' : '""'};
       }
@@ -44,11 +53,11 @@ export function generateDocumentStyles(options: RenderOptions): string {
     }
 
     html, body {
-      background: #ffffff;
-      color: #111827;
-      font-family: ${options.fontFamily};
-      font-size: ${options.baseFontSize};
-      line-height: ${options.lineHeight};
+      background: ${tokens.colors.bgDocument};
+      color: ${tokens.colors.textPrimary};
+      font-family: ${userFontFamily};
+      font-size: ${userBaseFontSize};
+      line-height: ${userLineHeight};
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
@@ -63,112 +72,120 @@ export function generateDocumentStyles(options: RenderOptions): string {
       margin: 0 auto;
     }
 
-    /* Document Header */
+    /* ── Document Header ────────────────────────────────────────────────── */
     .document-header {
-      border-bottom: 2px solid #e5e7eb;
-      padding-bottom: 12px;
-      margin-bottom: 24px;
+      border-bottom: 1px solid ${tokens.colors.borderLight};
+      padding-bottom: ${tokens.spacing.documentHeaderBottomPadding};
+      margin-bottom: ${tokens.spacing.documentHeaderBottomMargin};
       break-after: avoid;
     }
 
     .document-title {
-      font-size: 1.8em;
-      font-weight: 700;
-      color: #111827;
-      line-height: 1.25;
+      font-family: ${tokens.typography.fontFamilyHeading};
+      font-size: ${tokens.typography.sizeTitle};
+      font-weight: ${tokens.typography.weightBold};
+      color: ${tokens.colors.headingText};
+      line-height: ${tokens.typography.lineHeightTitle};
+      letter-spacing: -0.01em;
       margin-bottom: 6px;
     }
 
     .document-metadata {
-      font-size: 0.85em;
-      color: #6b7280;
+      font-size: ${tokens.typography.sizeSmall};
+      color: ${tokens.colors.textMuted};
       display: flex;
       gap: 16px;
     }
 
-    /* Conversation & Message Cards */
+    /* ── Conversation & Message Stream ──────────────────────────────────── */
     .conversation {
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: ${tokens.spacing.messageGap};
     }
 
     .message {
       break-inside: avoid;
-      padding: 14px 16px;
-      border-radius: 8px;
-      border: 1px solid #e5e7eb;
+      padding: ${tokens.spacing.messagePadding};
+      border-radius: 6px;
+      border: 1px solid ${tokens.colors.borderLight};
     }
 
     .message-user {
-      background: #f9fafb;
-      border-left: 4px solid #2563eb;
+      background: ${tokens.colors.userBg};
+      border-left: ${tokens.spacing.messageBorderWidth} solid ${tokens.colors.userAccent};
     }
 
     .message-assistant {
-      background: #ffffff;
-      border-left: 4px solid #10b981;
+      background: ${tokens.colors.assistantBg};
+      border-left: ${tokens.spacing.messageBorderWidth} solid ${tokens.colors.assistantAccent};
     }
 
     .message-role {
-      font-size: 0.75em;
-      font-weight: 700;
+      font-size: ${tokens.typography.sizeSmall};
+      font-weight: ${tokens.typography.weightSemibold};
       text-transform: uppercase;
       letter-spacing: 0.05em;
       margin-bottom: 8px;
     }
 
     .message-user .message-role {
-      color: #1d4ed8;
+      color: ${tokens.colors.userRoleText};
     }
 
     .message-assistant .message-role {
-      color: #047857;
+      color: ${tokens.colors.assistantRoleText};
     }
 
     .message-body {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
     }
 
-    /* Paragraphs */
+    /* ── Paragraphs & Typography ────────────────────────────────────────── */
     p {
-      margin-bottom: 6px;
-      color: #1f2937;
+      margin-bottom: ${tokens.spacing.paragraphMarginBottom};
+      color: ${tokens.colors.textPrimary};
     }
 
-    /* Headings */
+    /* ── Headings ────────────────────────────────────────────────────────── */
     h1, h2, h3, h4, h5, h6 {
-      color: #111827;
-      font-weight: 700;
-      line-height: 1.3;
-      margin-top: ${options.headingSpacing ? '14px' : '6px'};
-      margin-bottom: 6px;
+      font-family: ${tokens.typography.fontFamilyHeading};
+      color: ${tokens.colors.headingText};
+      font-weight: ${tokens.typography.weightSemibold};
+      line-height: ${tokens.typography.lineHeightHeading};
+      margin-top: ${options.headingSpacing ? tokens.spacing.headingMarginTop : '8px'};
+      margin-bottom: ${tokens.spacing.headingMarginBottom};
       break-after: avoid;
     }
 
-    h1 { font-size: 1.5em; }
-    h2 { font-size: 1.3em; }
-    h3 { font-size: 1.15em; }
-    h4 { font-size: 1.05em; }
-    h5 { font-size: 1.0em; }
-    h6 { font-size: 0.9em; }
+    h1 { font-size: ${tokens.typography.sizeH1}; font-weight: ${tokens.typography.weightBold}; }
+    h2 { font-size: ${tokens.typography.sizeH2}; }
+    h3 { font-size: ${tokens.typography.sizeH3}; }
+    h4 { font-size: ${tokens.typography.sizeH4}; }
+    h5 { font-size: ${tokens.typography.sizeH5}; }
+    h6 { font-size: ${tokens.typography.sizeH6}; }
 
-    /* Lists */
+    /* ── Lists ───────────────────────────────────────────────────────────── */
     ul, ol {
-      padding-left: 20px;
-      margin-bottom: 8px;
+      padding-left: ${tokens.spacing.listPaddingLeft};
+      margin-bottom: ${tokens.spacing.paragraphMarginBottom};
     }
 
     li {
+      margin-bottom: ${tokens.spacing.listItemMarginBottom};
+    }
+
+    ul ul, ol ol, ul ol, ol ul {
+      margin-top: 4px;
       margin-bottom: 4px;
     }
 
-    /* Code Blocks */
+    /* ── Code Blocks ─────────────────────────────────────────────────────── */
     .code-wrapper {
       break-inside: avoid;
-      margin: 10px 0;
+      margin: ${tokens.spacing.blockMargin} 0;
       border-radius: 6px;
       border: 1px solid ${codeBorder};
       background: ${codeBg};
@@ -176,10 +193,10 @@ export function generateDocumentStyles(options: RenderOptions): string {
     }
 
     .code-header {
-      background: ${isDarkCode ? '#2d2d2d' : '#e2e8f0'};
-      color: ${isDarkCode ? '#9cdcfe' : '#334155'};
-      font-family: "JetBrains Mono", Consolas, monospace;
-      font-size: 0.75em;
+      background: ${codeHeaderBg};
+      color: ${isDarkCode ? '#94a3b8' : '#475569'};
+      font-family: ${tokens.typography.fontFamilyCode};
+      font-size: ${tokens.typography.sizeSmall};
       padding: 4px 12px;
       text-transform: lowercase;
       border-bottom: 1px solid ${codeBorder};
@@ -187,13 +204,14 @@ export function generateDocumentStyles(options: RenderOptions): string {
 
     pre {
       margin: 0;
-      padding: 12px;
+      padding: ${tokens.spacing.codePadding};
       background: ${codeBg};
       color: ${codeText};
-      font-family: "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, monospace;
-      font-size: 0.9em;
+      font-family: ${tokens.typography.fontFamilyCode};
+      font-size: ${tokens.typography.sizeCode};
       line-height: 1.45;
-      white-space: pre;
+      white-space: pre-wrap;
+      word-break: break-all;
       overflow-x: auto;
     }
 
@@ -204,18 +222,18 @@ export function generateDocumentStyles(options: RenderOptions): string {
 
     /* Inline Code */
     code {
-      font-family: "JetBrains Mono", Consolas, monospace;
+      font-family: ${tokens.typography.fontFamilyCode};
       font-size: 0.9em;
-      background: #f1f5f9;
-      color: #0f172a;
+      background: ${isDarkCode ? '#334155' : '#f1f5f9'};
+      color: ${isDarkCode ? '#f8fafc' : '#0f172a'};
       padding: 2px 5px;
       border-radius: 4px;
     }
 
-    /* Tables */
+    /* ── Tables ──────────────────────────────────────────────────────────── */
     .table-wrapper {
       break-inside: avoid;
-      margin: 10px 0;
+      margin: ${tokens.spacing.blockMargin} 0;
       overflow-x: auto;
     }
 
@@ -226,60 +244,61 @@ export function generateDocumentStyles(options: RenderOptions): string {
     }
 
     th, td {
-      border: 1px solid #d1d5db;
-      padding: 8px 12px;
+      border: 1px solid ${tokens.colors.tableBorder};
+      padding: ${tokens.spacing.tableCellPadding};
       text-align: left;
       word-break: break-word;
     }
 
     th {
-      background: #f3f4f6;
-      font-weight: 600;
+      background: ${tokens.colors.tableHeaderBg};
+      font-weight: ${tokens.typography.weightSemibold};
+      color: ${tokens.colors.headingText};
     }
 
     tr:nth-child(even) td {
-      background: #f9fafb;
+      background: ${tokens.colors.tableRowEvenBg};
     }
 
-    /* Blockquotes */
+    /* ── Blockquotes ─────────────────────────────────────────────────────── */
     blockquote {
       break-inside: avoid;
-      border-left: 4px solid #3b82f6;
-      background: #f8fafc;
-      padding: 8px 14px;
-      margin: 8px 0;
+      border-left: 4px solid ${tokens.colors.quoteBorder};
+      background: ${tokens.colors.quoteBg};
+      padding: ${tokens.spacing.quotePadding};
+      margin: ${tokens.spacing.blockMargin} 0;
       font-style: italic;
-      color: #334155;
+      color: ${tokens.colors.quoteText};
     }
 
-    /* Images */
+    /* ── Images ──────────────────────────────────────────────────────────── */
     .image-wrapper {
       break-inside: avoid;
-      margin: 10px 0;
+      margin: ${tokens.spacing.blockMargin} 0;
       text-align: center;
     }
 
     img {
       max-width: 100%;
       height: auto;
-      border-radius: 6px;
-      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      border: 1px solid ${tokens.colors.borderLight};
     }
 
     .image-caption {
-      font-size: 0.8em;
-      color: #6b7280;
+      font-size: ${tokens.typography.sizeSmall};
+      color: ${tokens.colors.textMuted};
       margin-top: 4px;
     }
 
-    /* Math */
+    /* ── Math ────────────────────────────────────────────────────────────── */
     .math-block {
       break-inside: avoid;
-      margin: 10px 0;
+      margin: ${tokens.spacing.blockMargin} 0;
       padding: 8px 12px;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 6px;
+      background: ${tokens.colors.quoteBg};
+      border: 1px solid ${tokens.colors.borderLight};
+      border-radius: 4px;
       font-family: "KaTeX_Main", "Times New Roman", serif;
       font-size: 1.05em;
     }
@@ -293,15 +312,15 @@ export function generateDocumentStyles(options: RenderOptions): string {
       padding: 1px 4px;
     }
 
-    /* Footer */
+    /* ── Footer ──────────────────────────────────────────────────────────── */
     .document-footer {
-      margin-top: 30px;
-      padding-top: 12px;
-      border-top: 1px solid #e5e7eb;
+      margin-top: ${tokens.spacing.footerMarginTop};
+      padding-top: ${tokens.spacing.footerPaddingTop};
+      border-top: 1px solid ${tokens.colors.borderLight};
       display: flex;
       justify-content: space-between;
-      font-size: 0.8em;
-      color: #9ca3af;
+      font-size: ${tokens.typography.sizeSmall};
+      color: ${tokens.colors.textMuted};
     }
   `;
 }
