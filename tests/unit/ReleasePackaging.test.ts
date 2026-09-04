@@ -41,10 +41,7 @@ describe('Automated Release Packaging & Dist Purity Audit Tests', () => {
   });
 
   it('2. package script produces valid release ZIP bundle in dist/', () => {
-    if (!fs.existsSync(distDir)) {
-      execSync('npm run build', { stdio: 'pipe' });
-    }
-
+    execSync('npm run build', { stdio: 'pipe' });
     execSync('node scripts/package.js', { stdio: 'pipe' });
 
     expect(fs.existsSync(zipPath)).toBe(true);
