@@ -192,7 +192,7 @@ describe('Phase 9 Long Conversation Recovery Semantics', () => {
     const doc = loadFixture('chatgpt-current-basic.html');
     const userTurn = doc.querySelector('[data-message-author-role="user"]');
     if (userTurn) {
-      userTurn.setAttribute('data-message-author-role', 'custom_unknown_role');
+      userTurn.innerHTML = '<span>no div</span>';
     }
 
     const vi = (await import('vitest')).vi;
@@ -242,7 +242,7 @@ describe('Phase 9 Long Conversation Recovery Semantics', () => {
     const doc = loadFixture('chatgpt-current-basic.html');
     const userTurn = doc.querySelector('[data-message-author-role="user"]');
     if (userTurn) {
-      userTurn.setAttribute('data-message-author-role', 'custom_unknown_role');
+      userTurn.innerHTML = '<span>no div</span>';
     }
 
     const baseConv = extractConversation(doc, '/c/test');
@@ -265,5 +265,62 @@ describe('Phase 9 Long Conversation Recovery Semantics', () => {
     expect(result.status).toBe('partial');
     expect(result.warnings.length).toBeGreaterThan(0);
     vi.doUnmock('../../src/core/conversation/LongConversationExtractor');
+  });
+});
+
+describe('Phase 13 Correction — Extraction Warning Precision & Auxiliary Role Rules', () => {
+  it('1. Fully extracted conversation with an auxiliary/unknown DOM candidate returns status success without false warnings', () => {
+    const doc = loadFixture('chatgpt-current-basic.html');
+    const container = doc.querySelector('[data-testid="conversation-turns-container"]');
+    if (container) {
+      const auxEl = doc.createElement('article');
+      auxEl.setAttribute('data-testid', 'conversation-turn-999');
+      auxEl.innerHTML = '<div class="aux-widget">Search Results Banner</div>';
+      container.appendChild(auxEl);
+    }
+
+    const result = extractConversationWithResult(doc, '/c/672a1b9e-4c80-8005-9f5b-123456789abc');
+
+    expect(result.status).toBe('success');
+    expect(result.conversation).not.toBeNull();
+    expect(result.conversation?.messages).toHaveLength(3);
+    expect(result.counts.user).toBe(1);
+    expect(result.counts.assistant).toBe(1);
+    expect(result.counts.unknown).toBe(1);
+    expect(result.warnings.some((w) => w.code === 'EXTRACTION_PARTIAL')).toBe(false);
+  });
+
+  it('2. Genuine incomplete extraction (missing content root) produces partial status and warning', () => {
+    const doc = loadFixture('chatgpt-current-basic.html');
+    const userTurn = doc.querySelector('[data-message-author-role="user"]');
+    if (userTurn) {
+      userTurn.innerHTML = '<span>no div</span>';
+    }
+
+    const result = extractConversationWithResult(doc, '/c/672a1b9e-4c80-8005-9f5b-123456789abc');
+
+    expect(result.status).toBe('partial');
+    expect(result.warnings.some((w) => w.code === 'EXTRACTION_PARTIAL')).toBe(true);
+    expect(result.warnings.some((w) => w.code === 'ADAPTER_MESSAGE_NOT_FOUND')).toBe(true);
+  });
+
+  it('3. Diagnostic context is serializable and readable without [object Object]', () => {
+    const doc = loadFixture('chatgpt-current-basic.html');
+    const userTurn = doc.querySelector('[data-message-author-role="user"]');
+    if (userTurn) {
+      userTurn.innerHTML = '<span>no div</span>';
+    }
+
+    const result = extractConversationWithResult(doc, '/c/672a1b9e-4c80-8005-9f5b-123456789abc');
+    const partialWarn = result.warnings.find((w) => w.code === 'EXTRACTION_PARTIAL');
+
+    expect(partialWarn).toBeDefined();
+    expect(partialWarn?.context).toBeTypeOf('object');
+    expect(partialWarn?.context).toHaveProperty('turns');
+    expect(partialWarn?.context).toHaveProperty('unknownRoles');
+
+    const serialized = JSON.stringify(partialWarn?.context);
+    expect(serialized).not.toContain('[object Object]');
+    expect(serialized).toContain('"turns"');
   });
 });

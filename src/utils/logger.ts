@@ -31,12 +31,14 @@ export const logger = {
   },
   diagnostic: (entry: DiagnosticEntry): void => {
     const formatted = `${PREFIX} [${entry.code}] ${entry.message}`;
+    const hasContext = entry.context !== undefined && entry.context !== null;
+
     if (entry.level === 'error') {
-      console.error(formatted, entry.context || '');
+      hasContext ? console.error(formatted, entry.context) : console.error(formatted);
     } else if (entry.level === 'warning') {
-      console.warn(formatted, entry.context || '');
+      hasContext ? console.warn(formatted, entry.context) : console.warn(formatted);
     } else if (debugMode) {
-      console.log(formatted, entry.context || '');
+      hasContext ? console.log(formatted, entry.context) : console.log(formatted);
     }
   },
 };

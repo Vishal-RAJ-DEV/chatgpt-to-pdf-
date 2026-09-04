@@ -40,9 +40,11 @@ export interface DiagnosticEntry {
 const ALLOWED_CONTEXT_KEYS = new Set([
   'turnIndex',
   'turnCount',
+  'turns',
   'userCount',
   'assistantCount',
   'unknownRoleCount',
+  'unknownRoles',
   'blockCount',
   'stage',
   'selector',

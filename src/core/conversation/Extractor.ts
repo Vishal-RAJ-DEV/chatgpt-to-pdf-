@@ -248,11 +248,11 @@ export function extractConversationWithResult(
     if (contentRoot) {
       blocks = extractContentBlocks(contentRoot);
       totalBlocks += blocks.length;
-    } else {
+    } else if (role === 'user' || role === 'assistant') {
       const warn = createDiagnosticEntry(
         'warning',
         'ADAPTER_MESSAGE_NOT_FOUND',
-        `Could not locate content root for turn ${index + 1}.`,
+        `Could not locate content root for ${role} turn ${index + 1}.`,
         { turnIndex: index + 1, role }
       );
       warnings.push(warn);
@@ -271,20 +271,28 @@ export function extractConversationWithResult(
   let confidence: 'high' | 'medium' | 'low' = 'high';
   let status: ExtractionStatus = 'success';
 
-  if (health.confidence === 'none' || health.confidence === 'low') {
+  const hasMissingContentRoots = warnings.some(
+    (w) => w.code === ('ADAPTER_MESSAGE_NOT_FOUND' as DiagnosticCode)
+  );
+  const hasRealMessages = userCount > 0 || assistantCount > 0;
+
+  if (health.confidence === 'none' || health.confidence === 'low' || !hasRealMessages) {
     confidence = 'low';
     status = 'partial';
-  } else if (unknownRoleCount > 0 || health.confidence === 'medium' || warnings.length > 0) {
+  } else if (hasMissingContentRoots) {
     confidence = 'medium';
     status = 'partial';
+  } else if (unknownRoleCount > 0 || health.confidence === 'medium') {
+    confidence = 'medium';
+    status = 'success';
   }
 
   if (status === 'partial') {
     const warn = createDiagnosticEntry(
       'warning',
       'EXTRACTION_PARTIAL',
-      'Conversation was extracted with potential partial issues or unknown roles.',
-      { turns: messages.length, unknownRoles: unknownRoleCount, confidence }
+      'Conversation content may be incomplete due to missing content or low confidence.',
+      { turns: messages.length, userTurns: userCount, assistantTurns: assistantCount, unknownRoles: unknownRoleCount, confidence }
     );
     warnings.push(warn);
     logger.diagnostic(warn);
