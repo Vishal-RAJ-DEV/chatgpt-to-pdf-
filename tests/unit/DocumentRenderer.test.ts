@@ -500,3 +500,133 @@ describe('DocumentRenderer Full Regression Suite (All 36 Scenarios)', () => {
     expect(html).not.toContain('loading="lazy"');
   });
 });
+
+describe('Phase 8C Pagination & Page-Break Engineering (All 17 Scenarios)', () => {
+  const testConv: Conversation = {
+    id: 'c-pag',
+    title: 'Pagination Test Conversation',
+    url: 'https://chatgpt.com/c/c-pag',
+    createdAt: '2026-09-04T12:00:00Z',
+    messages: [
+      {
+        id: 't1',
+        role: 'user',
+        blocks: [{ type: 'paragraph', text: 'Prompt text' }],
+      },
+      {
+        id: 't2',
+        role: 'assistant',
+        blocks: [
+          { type: 'heading', level: 2, text: 'Technical Response Heading' },
+          { type: 'paragraph', text: 'Paragraph content for pagination testing.' },
+          { type: 'code', language: 'typescript', code: 'const a = 1;' },
+          { type: 'table', headers: ['Col A'], rows: [['Val A']] },
+          { type: 'image', src: 'https://example.com/img.png', alt: 'Test Img' },
+          { type: 'math', expression: 'x^2', displayMode: true },
+        ],
+      },
+    ],
+  };
+
+  it('P1. document header avoids awkward page break (break-after: avoid)', () => {
+    const html = renderConversation(testConv);
+    expect(html).toContain('.document-header {');
+    expect(html).toContain('break-after: avoid;');
+  });
+
+  it('P2. headings avoid separation from following content (break-after: avoid)', () => {
+    const html = renderConversation(testConv);
+    expect(html).toContain('h1, h2, h3, h4, h5, h6 {');
+    expect(html).toContain('break-after: avoid;');
+  });
+
+  it('P3. paragraphs use widow/orphan control', () => {
+    const html = renderConversation(testConv);
+    expect(html).toContain('p {');
+    expect(html).toContain('orphans: 3;');
+    expect(html).toContain('widows: 3;');
+  });
+
+  it('P4. small messages prefer staying together / message role labels avoid separation', () => {
+    const html = renderConversation(testConv);
+    expect(html).toContain('.message-role {');
+    expect(html).toContain('break-after: avoid;');
+  });
+
+  it('P5. very large messages are not globally forced to be unbreakable (break-inside: auto)', () => {
+    const html = renderConversation(testConv);
+    expect(html).toContain('.message {');
+    expect(html).toContain('break-inside: auto;');
+  });
+
+  it('P6. code block header avoids separation (break-after: avoid)', () => {
+    const html = renderConversation(testConv);
+    expect(html).toContain('.code-header {');
+    expect(html).toContain('break-after: avoid;');
+  });
+
+  it('P7. large code blocks remain splittable (break-inside: auto)', () => {
+    const html = renderConversation(testConv);
+    expect(html).toContain('.code-wrapper {');
+    expect(html).toContain('break-inside: auto;');
+  });
+
+  it('P8. table headers are configured for print repetition (display: table-header-group)', () => {
+    const html = renderConversation(testConv);
+    expect(html).toContain('thead {');
+    expect(html).toContain('display: table-header-group;');
+  });
+
+  it('P9. large tables remain splittable (break-inside: auto)', () => {
+    const html = renderConversation(testConv);
+    expect(html).toContain('.table-wrapper {');
+    expect(html).toContain('break-inside: auto;');
+  });
+
+  it('P10. images remain together (break-inside: avoid)', () => {
+    const html = renderConversation(testConv);
+    expect(html).toContain('.image-wrapper {');
+    expect(html).toContain('break-inside: avoid;');
+  });
+
+  it('P11. math blocks remain together (break-inside: avoid)', () => {
+    const html = renderConversation(testConv);
+    expect(html).toContain('.math-block {');
+    expect(html).toContain('break-inside: avoid;');
+  });
+
+  it('P12. A4 pagination CSS exists', () => {
+    const html = renderConversation(testConv, { pageSize: 'A4' });
+    expect(html).toContain('@page {');
+    expect(html).toContain('size: 210mm 297mm;');
+  });
+
+  it('P13. Letter pagination CSS remains supported', () => {
+    const html = renderConversation(testConv, { pageSize: 'LETTER' });
+    expect(html).toContain('@page {');
+    expect(html).toContain('size: 8.5in 11in;');
+  });
+
+  it('P14. portrait remains supported', () => {
+    const html = renderConversation(testConv, { pageSize: 'A4', orientation: 'portrait' });
+    expect(html).toContain('size: 210mm 297mm;');
+  });
+
+  it('P15. landscape remains supported', () => {
+    const html = renderConversation(testConv, { pageSize: 'A4', orientation: 'landscape' });
+    expect(html).toContain('size: 297mm 210mm;');
+  });
+
+  it('P16. dynamic margins remain reflected in @page', () => {
+    const html = renderConversation(testConv, { marginTop: '22mm', marginBottom: '18mm' });
+    expect(html).toContain('margin-top: 22mm;');
+    expect(html).toContain('margin-bottom: 18mm;');
+  });
+
+  it('P17. footer/page number behavior remains intact', () => {
+    const html = renderConversation(testConv, { showFooterPageNumbers: true });
+    expect(html).toContain('.document-footer {');
+    expect(html).toContain('break-inside: avoid;');
+    expect(html).toContain('content: counter(page);');
+  });
+});
