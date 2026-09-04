@@ -13,6 +13,7 @@ import { ExportService } from '../../core/export/ExportService';
 
 export class PopupUI {
   private exportService: ExportService;
+  private isExporting: boolean = false;
 
   constructor(exportService?: ExportService) {
     this.exportService = exportService || new ExportService();
@@ -54,28 +55,34 @@ export class PopupUI {
   public async init(): Promise<void> {
     this.updateBadge('Checking page…', 'info');
 
-    // Use richer health-check-backed detection to distinguish:
-    //   'conversation' — export-ready ChatGPT conversation
-    //   'chatgpt'      — ChatGPT host but no detectable conversation
-    //   'unsupported'  — not chatgpt.com at all
-    const readiness = await this.exportService.checkConversationReady();
+    try {
+      // Use health-check-backed detection to distinguish:
+      //   'conversation' — export-ready ChatGPT conversation
+      //   'chatgpt'      — ChatGPT host but no detectable conversation
+      //   'unsupported'  — not chatgpt.com at all
+      const readiness = await this.exportService.checkConversationReady();
 
-    switch (readiness) {
-      case 'conversation':
-        this.updateBadge('Ready — ChatGPT conversation', 'success');
-        this.setExportButtonEnabled(true);
-        break;
-      case 'chatgpt':
-        this.updateBadge('ChatGPT (no conversation)', 'warn');
-        this.setExportButtonEnabled(false);
-        this.showStatus('Open a ChatGPT conversation to export.', 'info');
-        break;
-      case 'unsupported':
-      default:
-        this.updateBadge('Unsupported page', 'error');
-        this.setExportButtonEnabled(false);
-        this.showStatus('Navigate to a ChatGPT conversation to export.', 'info');
-        break;
+      switch (readiness) {
+        case 'conversation':
+          this.updateBadge('Ready — ChatGPT conversation', 'success');
+          this.setExportButtonEnabled(true);
+          break;
+        case 'chatgpt':
+          this.updateBadge('ChatGPT (no conversation)', 'warn');
+          this.setExportButtonEnabled(false);
+          this.showStatus('Open a ChatGPT conversation to export.', 'info');
+          break;
+        case 'unsupported':
+        default:
+          this.updateBadge('Unsupported page', 'error');
+          this.setExportButtonEnabled(false);
+          this.showStatus('Navigate to a ChatGPT conversation to export.', 'info');
+          break;
+      }
+    } catch {
+      this.updateBadge('Error checking page', 'error');
+      this.setExportButtonEnabled(false);
+      this.showStatus('Could not determine conversation readiness.', 'error');
     }
 
     const exportBtn = this.getElement<HTMLButtonElement>('export-btn');
@@ -94,6 +101,11 @@ export class PopupUI {
   }
 
   public async handleExport(): Promise<void> {
+    if (this.isExporting) {
+      return;
+    }
+
+    this.isExporting = true;
     const exportBtn = this.getElement<HTMLButtonElement>('export-btn');
     if (exportBtn) exportBtn.disabled = true;
 
@@ -133,10 +145,12 @@ export class PopupUI {
     } catch {
       this.showStatus('PDF export failed.', 'error');
     } finally {
+      this.isExporting = false;
       if (exportBtn) exportBtn.disabled = false;
     }
   }
 }
+
 
 if (typeof document !== 'undefined' && document.getElementById('export-btn')) {
   document.addEventListener('DOMContentLoaded', () => {

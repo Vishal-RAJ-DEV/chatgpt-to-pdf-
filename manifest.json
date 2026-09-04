@@ -18,5 +18,7 @@
       "run_at": "document_idle"
     }
   ],
-  "options_page": "src/ui/options/options.html"
+  "options_page": "src/ui/options/options.html",
+  "minimum_chrome_version": "110"
 }
+

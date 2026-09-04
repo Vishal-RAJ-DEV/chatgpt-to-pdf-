@@ -13,12 +13,14 @@ A privacy-focused Chrome Extension (Manifest V3) that exports ChatGPT conversati
 - [Visual Design Reference](docs/DESIGN_REFERENCE.md)
 - [Testing Strategy](docs/TESTING.md)
 - [End-to-End Testing Guide](docs/E2E_TESTING.md)
+- [Release Checklist](docs/RELEASE_CHECKLIST.md)
 
 ## 🛠 Project Status
-- **Phases 0–9 (Complete)**: Core model, ChatGPT DOM adapter, rich content extraction, virtualized scrolling, Phase 8A tokens, Phase 8B layout, Phase 8C pagination, Phase 8D PDFCrowd controls, Phase 8E visual matching, Phase 9 resilience & diagnostics.
+- **Phases 0–9 (Complete)**: Core model, ChatGPT DOM adapter, rich content extraction, virtualized scrolling, Phase 8 visual matching, Phase 9 resilience & diagnostics.
 - **Phase 10 (Complete)**: Browser Integration & End-to-End Validation — full messaging round-trip, settings-to-renderer pipeline, print surface cleanup, SPA route navigation protection, and local privacy guarantees.
+- **Phase 11 (Complete)**: Production Hardening & Release Readiness — manifest V3 audit, permissions minimization, duplicate export click protection, accessibility focus rules, error boundary hardening, reproducible release packaging script, and release checklist.
 
-## 📦 How to Load in Chrome (Phase 1)
+## 📦 How to Build & Load in Chrome
 
 Follow these steps to build and load the extension into Chrome:
 
@@ -27,33 +29,27 @@ Follow these steps to build and load the extension into Chrome:
    npm install
    ```
 
-2. **Build the Extension**:
+2. **Build Extension**:
    ```bash
    npm run build
    ```
-   *(This compiles TypeScript, bundles the popup, options page, and content script, and outputs to the `dist/` directory.)*
+   *(Compiles TypeScript and outputs extension bundle to `dist/` directory.)*
 
-3. **Open Chrome Extensions Page**:
-   Open Chrome and navigate to `chrome://extensions`.
+3. **Package Release Bundle**:
+   ```bash
+   npm run package
+   ```
+   *(Creates release ZIP archive `dist/chatgpt-pdf-exporter-v0.1.0.zip` containing production assets.)*
 
-4. **Enable Developer Mode**:
-   Toggle the **Developer mode** switch in the top-right corner of the page.
+4. **Load Unpacked Extension into Chrome**:
+   - Open Chrome and navigate to `chrome://extensions`.
+   - Enable **Developer mode** (top-right corner).
+   - Click **Load unpacked** and select the `dist/` folder.
 
-5. **Load Unpacked Extension**:
-   Click the **Load unpacked** button in the top-left corner and select the `dist/` folder inside this project directory.
-
-6. **Verify Installation**:
-   - Click the extension icon in Chrome to view the popup status ("Extension installed ✓").
-   - Click **Open Settings** to open the options page.
-   - Open [https://chatgpt.com](https://chatgpt.com), open the Developer Tools Console (`F12`), and confirm the diagnostic log:
-     ```text
-     [ChatGPT PDF Exporter] Content script loaded
-     [ChatGPT PDF Exporter] Host supported: true
-     [ChatGPT PDF Exporter] Document ready: true
-     ```
-
-## 🧪 Running Tests & Typechecking
+## 🧪 Verification Commands
 
 - **Typecheck**: `npm run typecheck`
-- **Unit Tests**: `npm test`
+- **Unit & Integration Tests**: `npm test`
 - **Build**: `npm run build`
+- **Package Release ZIP**: `npm run package`
+
