@@ -1,16 +1,18 @@
 /**
- * Long Conversation Extractor — Phase 7.
+ * Long Conversation Extractor — Phase 7 Final Hardening.
  *
  * Handles virtualized ChatGPT DOM structures where not all conversation turns are
  * mounted in the DOM simultaneously.
  *
  * Traversal Completeness Rules:
  *   1. Traversal MUST verify reaching both top and bottom boundaries of the scroll container.
- *   2. If maxDurationMs is reached at any point, throws ExtractionError('LONG_CONVERSATION_TIMEOUT').
- *   3. If maxIterations or maxStagnantIterations limit is reached before full traversal,
- *      throws ExtractionError('INCOMPLETE_CONVERSATION').
- *   4. Metadata completeness = 'complete' is ONLY set when full traversal completes successfully.
- *   5. Partial conversation models are NEVER returned as 'complete'.
+ *   2. Progress on each scroll step is determined by observable evidence (scrollTop, scrollHeight,
+ *      mounted turn IDs, or newly discovered turn count).
+ *   3. Stagnation (no progress for maxStagnantIterations) is treated as an UNRESOLVED failure and
+ *      throws ExtractionError('INCOMPLETE_CONVERSATION'). It NEVER force-jumps to boundaries or breaks with success.
+ *   4. Identity hierarchy: data-message-id > stable data-testid (conversation-turn-N) > positional turn index.
+ *      Content alone MUST NEVER merge two distinct turns.
+ *   5. Metadata completeness = 'complete' is ONLY set when full traversal completes successfully.
  *   6. User scroll position is ALWAYS restored in a finally block.
  */
 
@@ -41,7 +43,7 @@ export interface LongExtractorOptions {
   maxDurationMs?: number;
   /** Maximum scroll iterations allowed. Default: 60 */
   maxIterations?: number;
-  /** Maximum consecutive iterations without discovering new turns before aborting. Default: 5 */
+  /** Maximum consecutive iterations without discovering new turns or scroll progress before aborting. Default: 5 */
   maxStagnantIterations?: number;
   /** Delay (ms) between scroll steps for layout/mutation settling. Default: 150 */
   stepDelayMs?: number;
@@ -52,6 +54,13 @@ interface DiscoveredTurn {
   role: MessageRole;
   blocks: ContentBlock[];
   turnIndexHint: number;
+}
+
+interface TraversalState {
+  scrollTop: number;
+  scrollHeight: number;
+  mountedTurnKeys: string;
+  discoveredCount: number;
 }
 
 /**
@@ -84,6 +93,44 @@ export function parseTurnIndexHint(turnElement: Element, fallbackIndex: number):
     return parseInt(match[1], 10);
   }
   return fallbackIndex;
+}
+
+/**
+ * Captures the current observable state of the DOM and scroller for progress detection.
+ */
+function captureTraversalState(
+  container: HTMLElement,
+  root: Document | Element,
+  discoveredCount: number
+): TraversalState {
+  const candidates = findTurnCandidates(root);
+  const keys = candidates
+    .map((el, i) => getDeterministicMessageId(el, i))
+    .sort()
+    .join(',');
+
+  return {
+    scrollTop: container.scrollTop,
+    scrollHeight: container.scrollHeight,
+    mountedTurnKeys: keys,
+    discoveredCount,
+  };
+}
+
+/**
+ * Determines whether observable progress occurred between two traversal steps.
+ */
+function hasTraversalProgress(prev: TraversalState, curr: TraversalState): boolean {
+  // 1. New unique conversation turns collected
+  if (curr.discoveredCount > prev.discoveredCount) return true;
+  // 2. scrollTop changed meaningfully (>= 5px)
+  if (Math.abs(curr.scrollTop - prev.scrollTop) >= 5) return true;
+  // 3. scrollHeight changed
+  if (curr.scrollHeight !== prev.scrollHeight) return true;
+  // 4. Set of mounted turn IDs / test IDs in DOM changed
+  if (curr.mountedTurnKeys !== prev.mountedTurnKeys) return true;
+
+  return false;
 }
 
 export class LongConversationExtractor {
@@ -139,13 +186,12 @@ export class LongConversationExtractor {
         const contentRoot = findContentRoot(turnEl);
         const blocks = contentRoot ? extractContentBlocks(contentRoot) : [];
 
-        let messageId = getDeterministicMessageId(turnEl, globalDiscoveryCounter);
-
-        if (messageId.startsWith('turn-')) {
-          const fingerprint = computeTurnFingerprint(role, blocks);
-          messageId = `${role}-${fingerprint}`;
-        }
-
+        // Identity hierarchy:
+        //  1. data-message-id attribute (Primary)
+        //  2. data-testid attribute (e.g. conversation-turn-1)
+        //  3. positional turn index fallback (turn-N)
+        // Note: Content fingerprint is NEVER used to overwrite message ID or collapse distinct turns.
+        const messageId = getDeterministicMessageId(turnEl, globalDiscoveryCounter);
         const indexHint = parseTurnIndexHint(turnEl, globalDiscoveryCounter);
 
         if (!discoveredMap.has(messageId)) {
@@ -197,30 +243,25 @@ export class LongConversationExtractor {
             );
           }
 
+          const stateBefore = captureTraversalState(scrollContainer, root, discoveredMap.size);
+
           this.scroller.scrollByPx(scrollContainer, -400);
           await this.scroller.waitForDomMutation(scrollContainer, this.options.stepDelayMs);
+          collectMountedTurns();
 
-          const added = collectMountedTurns();
+          const stateAfter = captureTraversalState(scrollContainer, root, discoveredMap.size);
           iterations++;
 
-          if (added === 0) {
+          if (hasTraversalProgress(stateBefore, stateAfter)) {
+            stagnantCount = 0;
+          } else {
             stagnantCount++;
             if (stagnantCount >= this.options.maxStagnantIterations) {
-              // Forced scroll to top if stagnant
-              this.scroller.scrollToTop(scrollContainer);
-              await this.scroller.waitForDomMutation(scrollContainer, this.options.stepDelayMs);
-              collectMountedTurns();
-
-              if (!this.scroller.isAtTop(scrollContainer)) {
-                throw new ExtractionError(
-                  'INCOMPLETE_CONVERSATION',
-                  'Could not reach top of conversation container after stagnant iterations.'
-                );
-              }
-              break;
+              throw new ExtractionError(
+                'INCOMPLETE_CONVERSATION',
+                'Long conversation extraction stagnant without progress before reaching top boundary.'
+              );
             }
-          } else {
-            stagnantCount = 0;
           }
         }
         hasReachedTop = this.scroller.isAtTop(scrollContainer);
@@ -241,35 +282,31 @@ export class LongConversationExtractor {
             );
           }
 
+          const stateBefore = captureTraversalState(scrollContainer, root, discoveredMap.size);
+
           this.scroller.scrollByPx(scrollContainer, 400);
           await this.scroller.waitForDomMutation(scrollContainer, this.options.stepDelayMs);
+          collectMountedTurns();
 
-          const added = collectMountedTurns();
+          const stateAfter = captureTraversalState(scrollContainer, root, discoveredMap.size);
           iterations++;
 
-          if (added === 0) {
+          if (hasTraversalProgress(stateBefore, stateAfter)) {
+            stagnantCount = 0;
+          } else {
             stagnantCount++;
             if (stagnantCount >= this.options.maxStagnantIterations) {
-              this.scroller.scrollToBottom(scrollContainer);
-              await this.scroller.waitForDomMutation(scrollContainer, this.options.stepDelayMs);
-              collectMountedTurns();
-
-              if (!this.scroller.isAtBottom(scrollContainer)) {
-                throw new ExtractionError(
-                  'INCOMPLETE_CONVERSATION',
-                  'Could not reach bottom of conversation container after stagnant iterations.'
-                );
-              }
-              break;
+              throw new ExtractionError(
+                'INCOMPLETE_CONVERSATION',
+                'Long conversation extraction stagnant without progress before reaching bottom boundary.'
+              );
             }
-          } else {
-            stagnantCount = 0;
           }
         }
         hasReachedBottom = this.scroller.isAtBottom(scrollContainer);
       }
 
-      // Step 3: Explicit Completeness Assertion
+      // Step 3: Explicit Completeness Assertion — Fail closed if boundaries unverified
       if (!hasReachedTop || !hasReachedBottom) {
         throw new ExtractionError(
           'INCOMPLETE_CONVERSATION',

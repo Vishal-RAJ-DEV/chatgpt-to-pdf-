@@ -1,4 +1,4 @@
-# Long Conversations & Virtualized DOM Handling — Phase 7
+# Long Conversations & Virtualized DOM Handling — Phase 7 Final Hardening
 
 ## Overview
 
@@ -23,9 +23,9 @@ ConversationScroller
     ↓
 LongConversationExtractor
   - Extracts turn content per step using ChatGPTAdapter & RichContentExtractor
-  - Performs deterministic turn deduplication (data-message-id > data-testid > content hash)
-  - Reconstructs original chronological sequence based on turn index hints
-  - Enforces safety duration & iteration limits
+  - Performs deterministic turn deduplication (data-message-id > data-testid > positional index)
+  - Evaluates observable progress evidence on each scroll step (scrollTop, scrollHeight, mounted IDs, count)
+  - Enforces fail-closed safety duration & iteration limits
   - Restores original user scroll position in finally block
   - Sets metadata.completeness = 'complete' ONLY when full traversal completes successfully
     ↓
@@ -36,24 +36,28 @@ DocumentRenderer → SettingsManager → PrintService
 
 ---
 
-## Key Components
+## Key Rules & Contracts
 
-### 1. `ConversationScroller` (`src/adapters/chatgpt/ConversationScroller.ts`)
-- **Scroll Container Discovery**: Scans `chatGPTSelectors.conversationContainer` (`[data-testid="conversation-turns-container"]`) and parent elements for vertical scroll overflow (`overflowY: auto | scroll`).
-- **Position Capture & Restoration**: Remembers `scrollTop` prior to traversal and restores it in a `finally` block upon completion or exception.
-- **DOM Mutation Watching**: Uses `MutationObserver` to await node insertions/replacements on scroll steps with a bounded fallback timeout.
+### 1. Fail-Closed Traversal Completeness
+- **Completion Definition**: Traversal reached both top and bottom boundaries AND traversal did not encounter unresolved progress failure AND the extractor did not terminate early due to safety limits.
+- **Fail-Closed Principle**: If traversal is uncertain or interrupted, the extractor throws `INCOMPLETE_CONVERSATION` or `LONG_CONVERSATION_TIMEOUT`. It NEVER returns a partial conversation marked `completeness: 'complete'`.
 
-### 2. `LongConversationExtractor` (`src/core/conversation/LongConversationExtractor.ts`)
-- **Deterministic Deduplication**:
+### 2. Evidence-Based Stagnation & Progress
+- **Stagnation Is Not Completion**: A lack of newly discovered DOM nodes does NOT prove traversal is finished. The extractor NEVER force-jumps to boundaries (`scrollToTop`/`scrollToBottom`) to break out of stagnation.
+- **Observable Progress Evidence**: A scroll step is considered successful if ANY of the following changed:
+  1. `scrollTop` changed meaningfully ($\ge 5\text{px}$)
+  2. `scrollHeight` changed
+  3. Set of mounted turn IDs / test IDs in DOM changed
+  4. Number of discovered unique conversation turns increased
+- **Unresolved Stagnation**: If no progress occurs for `maxStagnantIterations` consecutive steps, the extractor treats traversal as unresolved and throws `ExtractionError('INCOMPLETE_CONVERSATION')`.
+
+### 3. Message Identity & Deduplication Hierarchy
+- **Identity Hierarchy**:
   1. `data-message-id` attribute (Primary)
   2. `data-testid` attribute (e.g. `conversation-turn-1`)
-  3. `role` + djb2 content fingerprint hash (Fallback)
-- **Chronological Order Reconstruction**: Sorts discovered turn records by numeric index hint parsed from `conversation-turn-N` or discovery sequence.
-- **Safety Limits & Completeness Assertion**:
-  - `maxDurationMs`: 20,000ms
-  - `maxIterations`: 60 scroll steps
-  - `maxStagnantIterations`: 5 steps without discovering new turns
-  - **Explicit Completeness Rule**: If limits expire or boundaries (top/bottom) cannot be verified, `LongConversationExtractor` throws `LONG_CONVERSATION_TIMEOUT` or `INCOMPLETE_CONVERSATION`. It NEVER returns a partial conversation marked `completeness: 'complete'`.
+  3. Positional turn index fallback (`turn-1`, `turn-2`)
+- **Identical Messages Preserved**: Content fingerprints are NEVER used to overwrite message IDs or merge distinct turns. Two legitimate conversation turns with identical text (e.g. user asks "Hello" twice) at `conversation-turn-1` and `conversation-turn-3` remain TWO distinct messages.
+- **Same Message Remounting**: When the viewport shifts and a turn with the same `data-message-id` or `conversation-turn-N` remounts, it is correctly deduplicated to 1 message.
 
 ---
 
