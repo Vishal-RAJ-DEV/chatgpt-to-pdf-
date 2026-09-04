@@ -4,16 +4,19 @@
  * Handles virtualized ChatGPT DOM structures where not all conversation turns are
  * mounted in the DOM simultaneously.
  *
- * Traversal Completeness Rules:
+ * Traversal Completeness & Logical Coverage Rules:
  *   1. Traversal MUST verify reaching both top and bottom boundaries of the scroll container.
- *   2. Progress on each scroll step is determined by observable evidence (scrollTop, scrollHeight,
- *      mounted turn IDs, or newly discovered turn count).
+ *   2. Progress is determined by observable evidence (new turns discovered, coverage set expanded,
+ *      mounted DOM turn keys changed, or scrollHeight changed). Physical scroll movement alone without
+ *      DOM node changes is NOT progress.
  *   3. Stagnation (no progress for maxStagnantIterations) is treated as an UNRESOLVED failure and
  *      throws ExtractionError('INCOMPLETE_CONVERSATION'). It NEVER force-jumps to boundaries or breaks with success.
- *   4. Identity hierarchy: data-message-id > stable data-testid (conversation-turn-N) > positional turn index.
+ *   4. Logical turn coverage tracking: when numeric conversation-turn-N indices exist, every index from
+ *      minIndex to maxIndex must be observed without gaps. Any missing index throws ExtractionError('INCOMPLETE_CONVERSATION').
+ *   5. Identity hierarchy: data-message-id > stable data-testid (conversation-turn-N) > positional turn index.
  *      Content alone MUST NEVER merge two distinct turns.
- *   5. Metadata completeness = 'complete' is ONLY set when full traversal completes successfully.
- *   6. User scroll position is ALWAYS restored in a finally block.
+ *   6. Metadata completeness = 'complete' is ONLY set when full traversal and logical coverage complete successfully.
+ *   7. User scroll position is ALWAYS restored in a finally block.
  */
 
 import {
@@ -43,7 +46,7 @@ export interface LongExtractorOptions {
   maxDurationMs?: number;
   /** Maximum scroll iterations allowed. Default: 60 */
   maxIterations?: number;
-  /** Maximum consecutive iterations without discovering new turns or scroll progress before aborting. Default: 5 */
+  /** Maximum consecutive iterations without discovering new turns or DOM progress before aborting. Default: 5 */
   maxStagnantIterations?: number;
   /** Delay (ms) between scroll steps for layout/mutation settling. Default: 150 */
   stepDelayMs?: number;
@@ -61,10 +64,11 @@ interface TraversalState {
   scrollHeight: number;
   mountedTurnKeys: string;
   discoveredCount: number;
+  coverageCount: number;
 }
 
 /**
- * Computes a deterministic content hash signature for fallback turn identity.
+ * Computes a deterministic content hash signature for fallback turn identity / diagnostics.
  */
 export function computeTurnFingerprint(role: string, blocks: readonly ContentBlock[]): string {
   const serialized = blocks
@@ -96,12 +100,26 @@ export function parseTurnIndexHint(turnElement: Element, fallbackIndex: number):
 }
 
 /**
+ * Parses explicit numeric turn index if present on element (e.g. conversation-turn-7 -> 7).
+ */
+export function parseNumericTurnIndex(turnElement: Element): number | null {
+  const testId = turnElement.getAttribute('data-testid') || '';
+  const match = testId.match(/conversation-turn-(\d+)/i);
+  if (match) {
+    const val = parseInt(match[1], 10);
+    return isNaN(val) ? null : val;
+  }
+  return null;
+}
+
+/**
  * Captures the current observable state of the DOM and scroller for progress detection.
  */
 function captureTraversalState(
   container: HTMLElement,
   root: Document | Element,
-  discoveredCount: number
+  discoveredCount: number,
+  coverageCount: number
 ): TraversalState {
   const candidates = findTurnCandidates(root);
   const keys = candidates
@@ -114,21 +132,23 @@ function captureTraversalState(
     scrollHeight: container.scrollHeight,
     mountedTurnKeys: keys,
     discoveredCount,
+    coverageCount,
   };
 }
 
 /**
  * Determines whether observable progress occurred between two traversal steps.
+ * Physical movement alone without DOM node changes or new turns is NOT progress.
  */
 function hasTraversalProgress(prev: TraversalState, curr: TraversalState): boolean {
   // 1. New unique conversation turns collected
   if (curr.discoveredCount > prev.discoveredCount) return true;
-  // 2. scrollTop changed meaningfully (>= 5px)
-  if (Math.abs(curr.scrollTop - prev.scrollTop) >= 5) return true;
-  // 3. scrollHeight changed
-  if (curr.scrollHeight !== prev.scrollHeight) return true;
-  // 4. Set of mounted turn IDs / test IDs in DOM changed
+  // 2. Numeric turn coverage set expanded
+  if (curr.coverageCount > prev.coverageCount) return true;
+  // 3. Set of mounted turn IDs / test IDs in DOM changed
   if (curr.mountedTurnKeys !== prev.mountedTurnKeys) return true;
+  // 4. scrollHeight changed
+  if (curr.scrollHeight !== prev.scrollHeight) return true;
 
   return false;
 }
@@ -149,7 +169,7 @@ export class LongConversationExtractor {
 
   /**
    * Extracts the full conversation, scrolling incrementally if virtualized nodes exist.
-   * Guarantees complete traversal or throws a specific ExtractionError.
+   * Guarantees complete traversal and logical turn coverage or throws a specific ExtractionError.
    */
   public async extractLongConversation(
     root: Document | Element = typeof document !== 'undefined' ? document : (null as unknown as Document),
@@ -175,6 +195,8 @@ export class LongConversationExtractor {
     const initialPos = this.scroller.captureScrollPosition(scrollContainer);
 
     const discoveredMap = new Map<string, DiscoveredTurn>();
+    const observedTurnIndices = new Set<number>();
+    let hasNumericTurnIndices = false;
     let globalDiscoveryCounter = 0;
 
     const collectMountedTurns = (): number => {
@@ -190,9 +212,14 @@ export class LongConversationExtractor {
         //  1. data-message-id attribute (Primary)
         //  2. data-testid attribute (e.g. conversation-turn-1)
         //  3. positional turn index fallback (turn-N)
-        // Note: Content fingerprint is NEVER used to overwrite message ID or collapse distinct turns.
         const messageId = getDeterministicMessageId(turnEl, globalDiscoveryCounter);
         const indexHint = parseTurnIndexHint(turnEl, globalDiscoveryCounter);
+        const numIdx = parseNumericTurnIndex(turnEl);
+
+        if (numIdx !== null) {
+          observedTurnIndices.add(numIdx);
+          hasNumericTurnIndices = true;
+        }
 
         if (!discoveredMap.has(messageId)) {
           discoveredMap.set(messageId, {
@@ -243,13 +270,23 @@ export class LongConversationExtractor {
             );
           }
 
-          const stateBefore = captureTraversalState(scrollContainer, root, discoveredMap.size);
+          const stateBefore = captureTraversalState(
+            scrollContainer,
+            root,
+            discoveredMap.size,
+            observedTurnIndices.size
+          );
 
           this.scroller.scrollByPx(scrollContainer, -400);
           await this.scroller.waitForDomMutation(scrollContainer, this.options.stepDelayMs);
           collectMountedTurns();
 
-          const stateAfter = captureTraversalState(scrollContainer, root, discoveredMap.size);
+          const stateAfter = captureTraversalState(
+            scrollContainer,
+            root,
+            discoveredMap.size,
+            observedTurnIndices.size
+          );
           iterations++;
 
           if (hasTraversalProgress(stateBefore, stateAfter)) {
@@ -282,13 +319,23 @@ export class LongConversationExtractor {
             );
           }
 
-          const stateBefore = captureTraversalState(scrollContainer, root, discoveredMap.size);
+          const stateBefore = captureTraversalState(
+            scrollContainer,
+            root,
+            discoveredMap.size,
+            observedTurnIndices.size
+          );
 
           this.scroller.scrollByPx(scrollContainer, 400);
           await this.scroller.waitForDomMutation(scrollContainer, this.options.stepDelayMs);
           collectMountedTurns();
 
-          const stateAfter = captureTraversalState(scrollContainer, root, discoveredMap.size);
+          const stateAfter = captureTraversalState(
+            scrollContainer,
+            root,
+            discoveredMap.size,
+            observedTurnIndices.size
+          );
           iterations++;
 
           if (hasTraversalProgress(stateBefore, stateAfter)) {
@@ -306,7 +353,7 @@ export class LongConversationExtractor {
         hasReachedBottom = this.scroller.isAtBottom(scrollContainer);
       }
 
-      // Step 3: Explicit Completeness Assertion — Fail closed if boundaries unverified
+      // Step 3: Explicit Completeness Assertion & Logical Coverage Validation
       if (!hasReachedTop || !hasReachedBottom) {
         throw new ExtractionError(
           'INCOMPLETE_CONVERSATION',
@@ -314,7 +361,39 @@ export class LongConversationExtractor {
         );
       }
 
-      // Reconstruct chronological order based on turnIndexHint
+      // If virtualized, validate logical coverage
+      if (isVirtualized) {
+        if (hasNumericTurnIndices) {
+          const sortedIndices = Array.from(observedTurnIndices).sort((a, b) => a - b);
+          if (sortedIndices.length === 0) {
+            throw new ExtractionError(
+              'INCOMPLETE_CONVERSATION',
+              'No logical turn indices observed during virtualized conversation traversal.'
+            );
+          }
+
+          const minIndex = sortedIndices[0];
+          const maxIndex = sortedIndices[sortedIndices.length - 1];
+
+          // Check for any missing gaps in numeric index set from minIndex to maxIndex
+          for (let idx = minIndex; idx <= maxIndex; idx++) {
+            if (!observedTurnIndices.has(idx)) {
+              throw new ExtractionError(
+                'INCOMPLETE_CONVERSATION',
+                `Logical turn index gap detected: conversation-turn-${idx} was never observed.`
+              );
+            }
+          }
+        } else {
+          // Virtualized conversation without stable numeric turn indices: cannot guarantee full coverage safely
+          throw new ExtractionError(
+            'INCOMPLETE_CONVERSATION',
+            'Cannot verify logical conversation coverage without stable numeric turn indices in virtualized DOM.'
+          );
+        }
+      }
+
+      // Step 4: Reconstruct chronological order based on turnIndexHint
       const sortedTurns = Array.from(discoveredMap.values()).sort(
         (a, b) => a.turnIndexHint - b.turnIndexHint
       );
@@ -353,7 +432,7 @@ export class LongConversationExtractor {
         metadata,
       };
     } finally {
-      // Step 4: Always restore user scroll position
+      // Step 5: Always restore user scroll position
       this.scroller.restoreScrollPosition(initialPos);
     }
   }
