@@ -391,6 +391,6 @@ export interface ExportSettings {
 - **Phase 3B (Complete)**: Plain ChatGPT conversation extraction engine and streaming protection.
 - **Phase 3C (Complete)**: Rich Content Extraction Engine (paragraphs, headings, lists, code, tables, quotes, images, math).
 - **Phase 4 (Complete)**: Document Renderer (pure HTML document generator, CSS print rules, security escaping, role filtering).
-- **Phase 5 (Pending)**: Settings System & User Configuration Persistence (`chrome.storage`).
+- **Phase 5 (Complete)**: Settings System & User Configuration Persistence (`chrome.storage`), validation engine, options UI.
 - **Phase 6 (Pending)**: Local Browser PDF Generation & Extension Export UI.
 

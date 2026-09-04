@@ -8,9 +8,133 @@
 </head>
 <body>
   <div class="options-container">
-    <h1 class="options-title">ChatGPT PDF Exporter</h1>
-    <h2 class="options-subtitle">Settings</h2>
-    <p class="placeholder-message">Settings will be available in a later phase.</p>
+    <header class="options-header">
+      <h1 class="options-title">ChatGPT PDF Exporter</h1>
+      <p class="options-subtitle">Customize document rendering and page layout settings</p>
+    </header>
+
+    <form id="settings-form" class="settings-form" novalidate>
+      <!-- General -->
+      <fieldset class="settings-group">
+        <legend>General</legend>
+        <div class="field-row">
+          <div class="field">
+            <label for="pageSize">Page Size</label>
+            <select id="pageSize" name="pageSize">
+              <option value="A4">A4</option>
+              <option value="LETTER">Letter</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="orientation">Orientation</label>
+            <select id="orientation" name="orientation">
+              <option value="portrait">Portrait</option>
+              <option value="landscape">Landscape</option>
+            </select>
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- Margins -->
+      <fieldset class="settings-group">
+        <legend>Margins</legend>
+        <div class="field-grid-4">
+          <div class="field">
+            <label for="marginTop">Top</label>
+            <input type="text" id="marginTop" name="marginTop" placeholder="18mm">
+          </div>
+          <div class="field">
+            <label for="marginRight">Right</label>
+            <input type="text" id="marginRight" name="marginRight" placeholder="18mm">
+          </div>
+          <div class="field">
+            <label for="marginBottom">Bottom</label>
+            <input type="text" id="marginBottom" name="marginBottom" placeholder="18mm">
+          </div>
+          <div class="field">
+            <label for="marginLeft">Left</label>
+            <input type="text" id="marginLeft" name="marginLeft" placeholder="18mm">
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- Typography -->
+      <fieldset class="settings-group">
+        <legend>Typography</legend>
+        <div class="field">
+          <label for="fontFamily">Font Family</label>
+          <input type="text" id="fontFamily" name="fontFamily">
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="baseFontSize">Font Size</label>
+            <input type="text" id="baseFontSize" name="baseFontSize" placeholder="10pt">
+          </div>
+          <div class="field">
+            <label for="lineHeight">Line Height</label>
+            <input type="number" id="lineHeight" name="lineHeight" step="0.1" min="0.5" max="3.0">
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- Content -->
+      <fieldset class="settings-group">
+        <legend>Content Options</legend>
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="showUserMessages" name="showUserMessages">
+            Include User Messages
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="showAssistantMessages" name="showAssistantMessages">
+            Include Assistant Messages
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="showConversationTitle" name="showConversationTitle">
+            Show Conversation Title
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="showDate" name="showDate">
+            Show Date
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="showFooterPageNumbers" name="showFooterPageNumbers">
+            Show Page Numbers
+          </label>
+        </div>
+      </fieldset>
+
+      <!-- Code Formatting -->
+      <fieldset class="settings-group">
+        <legend>Code Formatting</legend>
+        <div class="field">
+          <label for="codeTheme">Code Block Theme</label>
+          <select id="codeTheme" name="codeTheme">
+            <option value="dark">Dark Theme</option>
+            <option value="light">Light Theme</option>
+          </select>
+        </div>
+      </fieldset>
+
+      <!-- Layout -->
+      <fieldset class="settings-group">
+        <legend>Layout</legend>
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="headingSpacing" name="headingSpacing">
+            Enhanced Heading Spacing
+          </label>
+        </div>
+      </fieldset>
+
+      <!-- Feedback & Actions -->
+      <div id="status-message" class="status-message" aria-live="polite"></div>
+
+      <div class="actions">
+        <button type="button" id="save-btn" class="btn btn-primary">Save Settings</button>
+        <button type="button" id="reset-btn" class="btn btn-secondary">Reset to Defaults</button>
+      </div>
+    </form>
   </div>
   <script type="module" src="./options.ts"></script>
 </body>
