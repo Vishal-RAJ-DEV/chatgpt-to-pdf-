@@ -384,8 +384,13 @@ export interface ExportSettings {
 
 ## 8. Development Roadmap & Incremental Phases
 
-- **Phase 0**: Project discovery, architecture definition, documentation & repository scaffolding. *(Current Phase)*
-- **Phase 1**: Core Data Model, ChatGPT Adapter (Primary selectors), Document Renderer & Local Browser Print Exporter.
-- **Phase 2**: Settings UI (Popup & Storage), Configuration options (Typography, margins, content filters).
-- **Phase 3**: Enhanced Content Parsing (Code syntax highlighting, math equations, table formatting, images).
-- **Phase 4**: Advanced features (Long chat auto-scroller, DOM fallback heuristics, DOM health check UI).
+- **Phase 0 (Complete)**: Project discovery, architecture definition, documentation & repository scaffolding.
+- **Phase 1 (Complete)**: Extension Foundation, Chrome MV3 manifest, Vite build setup, popup UI, content script diagnostics.
+- **Phase 2 (Complete)**: Current ChatGPT DOM discovery, selector registry, adapter health checks, and DOM fixtures.
+- **Phase 3A (Complete)**: Normalized Conversation Domain Model specification and pure TypeScript contracts.
+- **Phase 3B (Complete)**: Plain ChatGPT conversation extraction engine and streaming protection.
+- **Phase 3C (Complete)**: Rich Content Extraction Engine (paragraphs, headings, lists, code, tables, quotes, images, math).
+- **Phase 4 (Complete)**: Document Renderer (pure HTML document generator, CSS print rules, security escaping, role filtering).
+- **Phase 5 (Pending)**: Settings System & User Configuration Persistence (`chrome.storage`).
+- **Phase 6 (Pending)**: Local Browser PDF Generation & Extension Export UI.
+
