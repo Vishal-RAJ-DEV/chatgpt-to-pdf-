@@ -102,3 +102,34 @@ export function createDiagnosticEntry(
     context: sanitizeDiagnosticContext(context),
   };
 }
+
+const VALID_DIAGNOSTIC_CODES = new Set<string>([
+  'UNSUPPORTED_HOST',
+  'STREAMING_IN_PROGRESS',
+  'CONVERSATION_NOT_FOUND',
+  'NO_TURNS_FOUND',
+  'INCOMPLETE_CONVERSATION',
+  'LONG_CONVERSATION_TIMEOUT',
+  'ADAPTER_CONTAINER_NOT_FOUND',
+  'ADAPTER_MESSAGE_NOT_FOUND',
+  'EXTRACTION_EMPTY_SUSPICIOUS',
+  'EXTRACTION_PARTIAL',
+  'EXTRACTION_BLOCK_PARSE_FAILED',
+  'RENDER_UNKNOWN_BLOCK',
+  'RENDER_UNSAFE_URL',
+  'EXPORT_RENDER_FAILED',
+  'EXPORT_PRINT_FAILED',
+  'SETTINGS_STORAGE_FAILED',
+  'SETTINGS_INVALID',
+]);
+
+/**
+ * Safely converts an arbitrary code string to a strongly typed DiagnosticCode.
+ * Falls back to 'EXTRACTION_PARTIAL' if the code string is unmapped.
+ */
+export function toDiagnosticCode(code: string): DiagnosticCode {
+  if (VALID_DIAGNOSTIC_CODES.has(code)) {
+    return code as DiagnosticCode;
+  }
+  return 'EXTRACTION_PARTIAL';
+}

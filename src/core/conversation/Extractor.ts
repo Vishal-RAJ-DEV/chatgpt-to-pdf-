@@ -20,7 +20,12 @@ import {
 } from './Model';
 
 import { ExtractionResult, ExtractionStatus } from './ExtractionResult';
-import { createDiagnosticEntry, DiagnosticCode, DiagnosticEntry } from '../../utils/Diagnostics';
+import {
+  createDiagnosticEntry,
+  DiagnosticCode,
+  DiagnosticEntry,
+  toDiagnosticCode,
+} from '../../utils/Diagnostics';
 
 import {
   findConversationRoot,
@@ -146,8 +151,22 @@ export function extractConversationWithResult(
 
   // Detect suspicious empty extraction vs legitimate empty
   if (turns.length === 0) {
+    const hasPromptInput = Boolean(
+      root &&
+        root.querySelector &&
+        root.querySelector('#prompt-textarea, textarea, form button[data-testid="send-button"], form button[aria-label*="Send"]')
+    );
+    const hasLoadedTitleElement = Boolean(
+      root &&
+        root.querySelector &&
+        root.querySelector('main h1, h1')
+    );
+
+    const hasLoadedUiEvidence = hasPromptInput || hasLoadedTitleElement;
+
     const hasPositiveEvidence =
       Boolean(conversationRoot) &&
+      hasLoadedUiEvidence &&
       (Boolean(conversationId) || (title !== 'ChatGPT Conversation' && title !== 'ChatGPT'));
 
     if (hasPositiveEvidence) {
@@ -318,7 +337,16 @@ export function extractConversation(
 
   if (result.status === 'failure' || !result.conversation) {
     const firstErr = result.errors[0] || result.warnings[0];
-    const code = firstErr ? (firstErr.code as unknown as ExtractionErrorCode) : 'CONVERSATION_NOT_FOUND';
+    const rawCode = firstErr ? firstErr.code : 'CONVERSATION_NOT_FOUND';
+    const code: ExtractionErrorCode =
+      rawCode === 'STREAMING_IN_PROGRESS' ||
+      rawCode === 'CONVERSATION_NOT_FOUND' ||
+      rawCode === 'NO_TURNS_FOUND' ||
+      rawCode === 'INCOMPLETE_CONVERSATION' ||
+      rawCode === 'LONG_CONVERSATION_TIMEOUT' ||
+      rawCode === 'UNSUPPORTED_HOST'
+        ? rawCode
+        : 'CONVERSATION_NOT_FOUND';
     const msg = firstErr ? firstErr.message : 'Failed to extract conversation content.';
     throw new ExtractionError(code, msg);
   }
@@ -387,11 +415,8 @@ export async function extractConversationWithResultAsync(
     };
   } catch (err) {
     if (err instanceof ExtractionError) {
-      const longErrEntry = createDiagnosticEntry(
-        'warning',
-        err.code as DiagnosticCode,
-        err.message
-      );
+      const diagCode = toDiagnosticCode(err.code);
+      const longErrEntry = createDiagnosticEntry('warning', diagCode, err.message);
 
       const preservedWarnings = [...syncResult.warnings, longErrEntry];
 
@@ -410,11 +435,7 @@ export async function extractConversationWithResultAsync(
         conversation: null,
         warnings: preservedWarnings,
         errors: [
-          createDiagnosticEntry(
-            'error',
-            err.code as DiagnosticCode,
-            err.message
-          ),
+          createDiagnosticEntry('error', diagCode, err.message),
           ...syncResult.errors,
         ],
         counts: { turns: 0, user: 0, assistant: 0, unknown: 0, blocks: 0 },

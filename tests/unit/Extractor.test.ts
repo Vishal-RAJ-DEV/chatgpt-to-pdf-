@@ -139,11 +139,15 @@ describe('Empty & Unknown Role Message Handling', () => {
 });
 
 describe('Phase 9 Empty State Policies & Evidence Requirements', () => {
-  it('identifies legitimate empty conversation when positive evidence (URL pathname ID) is present', () => {
+  it('A) identifies legitimate empty conversation when positive evidence (URL ID + prompt input UI) is present', () => {
     const doc = document.implementation.createHTMLDocument('ChatGPT');
     const container = doc.createElement('div');
     container.setAttribute('data-testid', 'conversation-turns-container');
     doc.body.appendChild(container);
+
+    const textarea = doc.createElement('textarea');
+    textarea.id = 'prompt-textarea';
+    doc.body.appendChild(textarea);
 
     const result = extractConversationWithResult(doc, '/c/672a1b9e-4c80-8005-9f5b-123456789abc');
 
@@ -153,17 +157,26 @@ describe('Phase 9 Empty State Policies & Evidence Requirements', () => {
     expect(result.conversation?.messages).toHaveLength(0);
   });
 
-  it('treats 0 turns without positive evidence as suspicious_empty', () => {
+  it('B) treats URL ID + generic conversation shell without loaded UI evidence as suspicious_empty', () => {
     const doc = document.implementation.createHTMLDocument('ChatGPT');
     const container = doc.createElement('div');
     container.setAttribute('data-testid', 'conversation-turns-container');
     doc.body.appendChild(container);
 
-    const result = extractConversationWithResult(doc, '/');
+    const result = extractConversationWithResult(doc, '/c/672a1b9e-4c80-8005-9f5b-123456789abc');
 
     expect(result.status).toBe('suspicious_empty');
     expect(result.conversation).toBeNull();
     expect(result.warnings.some((w: any) => w.code === 'EXTRACTION_EMPTY_SUSPICIOUS')).toBe(true);
+  });
+
+  it('C) treats generic ChatGPT home/loading page with 0 turns as suspicious_empty or failure', () => {
+    const doc = document.implementation.createHTMLDocument('ChatGPT');
+    const result = extractConversationWithResult(doc, '/');
+
+    expect(result.status).toBe('failure');
+    expect(result.conversation).toBeNull();
+    expect(result.errors.some((e: any) => e.code === 'CONVERSATION_NOT_FOUND')).toBe(true);
   });
 });
 
@@ -173,5 +186,84 @@ describe('Phase 9 Long Conversation Recovery Semantics', () => {
     const result = await extractConversationWithResultAsync(doc, '/c/672a1b9e-4c80-8005-9f5b-123456789abc');
     expect(result.status).toBe('success');
     expect(result.warnings).toEqual([]);
+  });
+
+  it('A) partial sync + long extraction failure preserves partial conversation and appends long-extraction warning', async () => {
+    const doc = loadFixture('chatgpt-current-basic.html');
+    const userTurn = doc.querySelector('[data-message-author-role="user"]');
+    if (userTurn) {
+      userTurn.setAttribute('data-message-author-role', 'custom_unknown_role');
+    }
+
+    const vi = (await import('vitest')).vi;
+    vi.doMock('../../src/core/conversation/LongConversationExtractor', () => {
+      return {
+        LongConversationExtractor: class {
+          extractLongConversation() {
+            throw new ExtractionError('INCOMPLETE_CONVERSATION', 'Stagnation error');
+          }
+        },
+      };
+    });
+
+    const { extractConversationWithResultAsync } = await import('../../src/core/conversation/Extractor');
+    const result = await extractConversationWithResultAsync(doc, '/c/test');
+
+    expect(result.status).toBe('partial');
+    expect(result.conversation).not.toBeNull();
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.warnings.some((w: any) => w.code === 'INCOMPLETE_CONVERSATION')).toBe(true);
+    vi.doUnmock('../../src/core/conversation/LongConversationExtractor');
+  });
+
+  it('B) failed sync + long extraction failure with no usable conversation returns status failure and blocks export', async () => {
+    const doc = document.implementation.createHTMLDocument('ChatGPT');
+    const vi = (await import('vitest')).vi;
+    vi.doMock('../../src/core/conversation/LongConversationExtractor', () => {
+      return {
+        LongConversationExtractor: class {
+          extractLongConversation() {
+            throw new ExtractionError('CONVERSATION_NOT_FOUND', 'No container');
+          }
+        },
+      };
+    });
+
+    const { extractConversationWithResultAsync } = await import('../../src/core/conversation/Extractor');
+    const result = await extractConversationWithResultAsync(doc, '/');
+
+    expect(result.status).toBe('failure');
+    expect(result.conversation).toBeNull();
+    expect(result.errors.length).toBeGreaterThan(0);
+    vi.doUnmock('../../src/core/conversation/LongConversationExtractor');
+  });
+
+  it('C) long extraction returning non-complete conversation preserves status partial without promoting to success', async () => {
+    const doc = loadFixture('chatgpt-current-basic.html');
+    const userTurn = doc.querySelector('[data-message-author-role="user"]');
+    if (userTurn) {
+      userTurn.setAttribute('data-message-author-role', 'custom_unknown_role');
+    }
+
+    const baseConv = extractConversation(doc, '/c/test');
+    const syncConv = { ...baseConv, metadata: { ...baseConv.metadata, completeness: undefined } };
+
+    const vi = (await import('vitest')).vi;
+    vi.doMock('../../src/core/conversation/LongConversationExtractor', () => {
+      return {
+        LongConversationExtractor: class {
+          extractLongConversation() {
+            return Promise.resolve(syncConv);
+          }
+        },
+      };
+    });
+
+    const { extractConversationWithResultAsync } = await import('../../src/core/conversation/Extractor');
+    const result = await extractConversationWithResultAsync(doc, '/c/test');
+
+    expect(result.status).toBe('partial');
+    expect(result.warnings.length).toBeGreaterThan(0);
+    vi.doUnmock('../../src/core/conversation/LongConversationExtractor');
   });
 });
