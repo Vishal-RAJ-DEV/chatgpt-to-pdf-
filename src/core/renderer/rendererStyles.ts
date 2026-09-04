@@ -110,7 +110,7 @@ export function generateDocumentStyles(options: RenderOptions): string {
     .message {
       display: block;
       padding: ${tokens.spacing.messagePadding};
-      border-radius: 6px;
+      border-radius: ${tokens.spacing.borderRadius};
       border: 1px solid ${tokens.colors.borderLight};
       margin-bottom: ${tokens.spacing.messageGap};
     }
@@ -202,7 +202,7 @@ export function generateDocumentStyles(options: RenderOptions): string {
     /* ── Code Blocks ─────────────────────────────────────────────────────── */
     .code-wrapper {
       margin: ${tokens.spacing.blockMargin} 0;
-      border-radius: 6px;
+      border-radius: ${tokens.spacing.borderRadius};
       border: 1px solid ${codeBorder};
       background: ${codeBg};
       overflow: hidden;
@@ -241,10 +241,10 @@ export function generateDocumentStyles(options: RenderOptions): string {
     code {
       font-family: ${tokens.typography.fontFamilyCode};
       font-size: 0.9em;
-      background: ${isDarkCode ? '#334155' : '#f1f5f9'};
-      color: ${isDarkCode ? '#f8fafc' : '#0f172a'};
+      background: ${isDarkCode ? tokens.colors.codeInlineDarkBg : tokens.colors.codeInlineLightBg};
+      color: ${isDarkCode ? tokens.colors.codeInlineDarkText : tokens.colors.codeInlineLightText};
       padding: 2px 5px;
-      border-radius: 4px;
+      border-radius: ${tokens.spacing.borderRadiusSmall};
     }
 
     /* ── Tables ──────────────────────────────────────────────────────────── */
@@ -304,7 +304,7 @@ export function generateDocumentStyles(options: RenderOptions): string {
     img {
       max-width: 100%;
       height: auto;
-      border-radius: 4px;
+      border-radius: ${tokens.spacing.borderRadiusSmall};
       border: 1px solid ${tokens.colors.borderLight};
     }
 
@@ -320,7 +320,7 @@ export function generateDocumentStyles(options: RenderOptions): string {
       padding: 8px 12px;
       background: ${tokens.colors.quoteBg};
       border: 1px solid ${tokens.colors.borderLight};
-      border-radius: 4px;
+      border-radius: ${tokens.spacing.borderRadiusSmall};
       font-family: "KaTeX_Main", "Times New Roman", serif;
       font-size: 1.05em;
     }

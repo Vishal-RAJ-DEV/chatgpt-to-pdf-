@@ -703,3 +703,53 @@ describe('Phase 8D PDFCrowd-Inspired Export Options & Controls', () => {
     expect(html).not.toContain('Source:');
   });
 });
+
+describe('Phase 8E Visual Tokens & Reference PDF Visual Matching', () => {
+  const testConv: Conversation = {
+    id: 'c-8e',
+    title: 'Visual Polish Test Document',
+    url: 'https://chatgpt.com/c/c-8e',
+    createdAt: '2026-09-04T16:00:00Z',
+    messages: [
+      {
+        id: 'm1',
+        role: 'user',
+        blocks: [{ type: 'paragraph', text: 'Prompt with `inline code`' }],
+      },
+      {
+        id: 'm2',
+        role: 'assistant',
+        blocks: [
+          { type: 'heading', level: 2, text: 'Technical Report Heading' },
+          { type: 'paragraph', text: 'Body paragraph with technical details.' },
+        ],
+      },
+    ],
+  };
+
+  it('1. uses centralized design token radii and spacing in message cards', () => {
+    const html = renderConversation(testConv);
+    expect(html).toContain('border-radius: 6px;');
+    expect(html).toContain('margin-bottom: 16px;');
+  });
+
+  it('2. inline code consumes tokenized inline background and radius', () => {
+    const html = renderConversation(testConv, { codeTheme: 'dark' });
+    expect(html).toContain('background: #334155;');
+    expect(html).toContain('color: #f8fafc;');
+    expect(html).toContain('border-radius: 4px;');
+  });
+
+  it('3. light theme inline code consumes light tokenized inline background and radius', () => {
+    const html = renderConversation(testConv, { codeTheme: 'light' });
+    expect(html).toContain('background: #f1f5f9;');
+    expect(html).toContain('color: #0f172a;');
+  });
+
+  it('4. preserves block-flow pagination engineering guarantees', () => {
+    const html = renderConversation(testConv);
+    expect(html).toContain('.conversation {\n      display: block;\n    }');
+    expect(html).toContain('.message {\n      display: block;');
+    expect(html).toContain('.message-body {\n      display: block;\n    }');
+  });
+});

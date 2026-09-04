@@ -47,6 +47,8 @@ export interface DesignTokens {
     codePadding: string;
     footerMarginTop: string;
     footerPaddingTop: string;
+    borderRadius: string;
+    borderRadiusSmall: string;
   };
   colors: {
     textPrimary: string;
@@ -76,6 +78,10 @@ export interface DesignTokens {
     codeLightText: string;
     codeLightBorder: string;
     codeLightHeaderBg: string;
+    codeInlineDarkBg: string;
+    codeInlineDarkText: string;
+    codeInlineLightBg: string;
+    codeInlineLightText: string;
   };
   document: {
     pageSizeA4Width: string;
@@ -129,6 +135,8 @@ export const DEFAULT_DESIGN_TOKENS: DesignTokens = {
     codePadding: '10px 14px',
     footerMarginTop: '28px',
     footerPaddingTop: '12px',
+    borderRadius: '6px',
+    borderRadiusSmall: '4px',
   },
   colors: {
     textPrimary: '#0f172a',       // Slate 900
@@ -158,6 +166,10 @@ export const DEFAULT_DESIGN_TOKENS: DesignTokens = {
     codeLightText: '#0f172a',
     codeLightBorder: '#cbd5e1',
     codeLightHeaderBg: '#f1f5f9',
+    codeInlineDarkBg: '#334155',
+    codeInlineDarkText: '#f8fafc',
+    codeInlineLightBg: '#f1f5f9',
+    codeInlineLightText: '#0f172a',
   },
   document: {
     pageSizeA4Width: '210mm',
