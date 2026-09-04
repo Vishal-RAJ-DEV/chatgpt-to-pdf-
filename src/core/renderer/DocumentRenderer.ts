@@ -1,5 +1,5 @@
 /**
- * Pure Document Renderer — Phase 4.
+ * Pure Document Renderer — Phase 8B Professional Conversation & Content Layout.
  *
  * Converts a normalized `Conversation` domain model object into a complete, standalone,
  * printable HTML document string suitable for local browser printing and PDF generation.
@@ -118,16 +118,17 @@ function renderCode(block: CodeBlock): string {
 }
 
 /**
- * Recursively render ListItem hierarchies.
+ * Recursively render ListItem hierarchies with correct semantic list tag preservation.
  */
-function renderListItems(items: readonly ListItem[]): string {
+function renderListItems(items: readonly ListItem[], parentOrdered: boolean = false): string {
   return items
     .map((item) => {
       const itemText = escapeHtml(item.text);
-      const childList =
-        item.children && item.children.length > 0
-          ? `<ul>${renderListItems(item.children)}</ul>`
-          : '';
+      let childList = '';
+      if (item.children && item.children.length > 0) {
+        const tag = parentOrdered ? 'ol' : 'ul';
+        childList = `<${tag}>${renderListItems(item.children, parentOrdered)}</${tag}>`;
+      }
       return `<li>${itemText}${childList}</li>`;
     })
     .join('');
@@ -138,7 +139,7 @@ function renderListItems(items: readonly ListItem[]): string {
  */
 function renderList(block: ListBlock): string {
   const tag = block.ordered ? 'ol' : 'ul';
-  return `<${tag}>${renderListItems(block.items)}</${tag}>`;
+  return `<${tag}>${renderListItems(block.items, block.ordered)}</${tag}>`;
 }
 
 /**

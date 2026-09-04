@@ -1,5 +1,5 @@
 /**
- * Document Renderer CSS Styles — Phase 8A Professional PDF Visual Design System.
+ * Document Renderer CSS Styles — Phase 8B Professional Conversation & Content Layout.
  *
  * Generates print-ready, technical-report-oriented CSS for printable HTML output
  * based on centralized design tokens and user RenderOptions.
@@ -149,6 +149,14 @@ export function generateDocumentStyles(options: RenderOptions): string {
       color: ${tokens.colors.textPrimary};
     }
 
+    /* ── Links ───────────────────────────────────────────────────────────── */
+    a {
+      color: ${tokens.colors.userAccent};
+      text-decoration: underline;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+
     /* ── Headings ────────────────────────────────────────────────────────── */
     h1, h2, h3, h4, h5, h6 {
       font-family: ${tokens.typography.fontFamilyHeading};
@@ -211,7 +219,8 @@ export function generateDocumentStyles(options: RenderOptions): string {
       font-size: ${tokens.typography.sizeCode};
       line-height: 1.45;
       white-space: pre-wrap;
-      word-break: break-all;
+      overflow-wrap: break-word;
+      word-break: break-word;
       overflow-x: auto;
     }
 
@@ -247,6 +256,7 @@ export function generateDocumentStyles(options: RenderOptions): string {
       border: 1px solid ${tokens.colors.tableBorder};
       padding: ${tokens.spacing.tableCellPadding};
       text-align: left;
+      overflow-wrap: break-word;
       word-break: break-word;
     }
 
