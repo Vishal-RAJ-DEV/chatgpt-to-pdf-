@@ -25,7 +25,67 @@ import {
   TableBlock,
   ImageBlock,
   MathBlock,
+  InlineNode,
 } from './Model';
+
+/**
+ * Extracts semantic inline nodes (text, inline <code>, links <a>) from a DOM element.
+ */
+export function parseInlinesFromElement(el: Element): InlineNode[] {
+  const inlines: InlineNode[] = [];
+
+  function traverse(node: Node) {
+    if (node.nodeType === 3 /* Node.TEXT_NODE */) {
+      const text = node.textContent || '';
+      if (text) {
+        inlines.push({ type: 'text', text });
+      }
+      return;
+    }
+
+    if (node.nodeType === 1 /* Node.ELEMENT_NODE */) {
+      const elem = node as Element;
+      const tag = elem.tagName.toLowerCase();
+
+      if (tag === 'code') {
+        const codeText = elem.textContent || '';
+        if (codeText) {
+          inlines.push({ type: 'code', code: codeText });
+        }
+        return;
+      }
+
+      if (tag === 'a') {
+        const href = elem.getAttribute('href') || '';
+        const linkText = elem.textContent || href;
+        if (href || linkText) {
+          inlines.push({ type: 'link', href, text: linkText });
+        }
+        return;
+      }
+
+      Array.from(elem.childNodes).forEach((child) => traverse(child));
+    }
+  }
+
+  Array.from(el.childNodes).forEach((child) => traverse(child));
+
+  const merged: InlineNode[] = [];
+  for (const item of inlines) {
+    if (item.type === 'text') {
+      if (merged.length > 0 && merged[merged.length - 1].type === 'text') {
+        (merged[merged.length - 1] as { type: 'text'; text: string }).text += item.text;
+      } else {
+        merged.push({ type: 'text', text: item.text });
+      }
+    } else {
+      merged.push(item);
+    }
+  }
+
+  const hasSpecialNodes = merged.some((m) => m.type === 'code' || m.type === 'link');
+  return hasSpecialNodes ? merged : [];
+}
 
 /**
  * Normalizes text while preserving line-by-line leading indentation.
@@ -85,9 +145,11 @@ export function cloneAndSanitizeContent(contentRoot: Element): Element {
 function parseParagraph(el: Element): ParagraphBlock | null {
   const text = normalizeText(el.textContent || '');
   if (!text) return null;
+  const inlines = parseInlinesFromElement(el);
   return {
     type: 'paragraph',
     text,
+    ...(inlines.length > 0 ? { inlines } : {}),
   };
 }
 
@@ -102,11 +164,13 @@ function parseHeading(el: Element): HeadingBlock | null {
   const level = parseInt(levelMatch[1], 10) as 1 | 2 | 3 | 4 | 5 | 6;
   const text = normalizeText(el.textContent || '');
   if (!text) return null;
+  const inlines = parseInlinesFromElement(el);
 
   return {
     type: 'heading',
     level,
     text,
+    ...(inlines.length > 0 ? { inlines } : {}),
   };
 }
 
@@ -128,9 +192,15 @@ function parseListItem(liEl: Element): ListItem | null {
   });
 
   const text = normalizeText(liClone.textContent || '');
+  const inlines = parseInlinesFromElement(liClone);
 
   const children: ListItem[] = [];
+  let childOrdered: boolean | undefined = undefined;
+
   subListEls.forEach((subListEl) => {
+    if (childOrdered === undefined) {
+      childOrdered = subListEl.tagName === 'OL';
+    }
     Array.from(subListEl.children).forEach((subLi) => {
       if (subLi.tagName === 'LI') {
         const childItem = parseListItem(subLi);
@@ -143,7 +213,9 @@ function parseListItem(liEl: Element): ListItem | null {
 
   return {
     text,
-    children: children.length > 0 ? children : undefined,
+    ...(inlines.length > 0 ? { inlines } : {}),
+    ...(childOrdered !== undefined ? { ordered: childOrdered } : {}),
+    ...(children.length > 0 ? { children } : {}),
   };
 }
 
@@ -176,9 +248,11 @@ function parseList(el: Element): ListBlock | null {
 function parseQuote(el: Element): QuoteBlock | null {
   const text = normalizeText(el.textContent || '');
   if (!text) return null;
+  const inlines = parseInlinesFromElement(el);
   return {
     type: 'quote',
     text,
+    ...(inlines.length > 0 ? { inlines } : {}),
   };
 }
 

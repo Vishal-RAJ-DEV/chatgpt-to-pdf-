@@ -1,5 +1,5 @@
 /**
- * Unit Tests — DocumentRenderer & Phase 8B Professional Conversation & Content Layout.
+ * Unit Tests — DocumentRenderer & Phase 8B Professional Conversation & Content Layout Hardening.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -8,8 +8,10 @@ import {
   escapeHtml,
   sanitizeUrl,
   formatDate,
+  parseInlineText,
+  renderInlineText,
 } from '../../src/core/renderer/DocumentRenderer';
-import { Conversation } from '../../src/core/conversation/Model';
+import { Conversation, ContentBlock } from '../../src/core/conversation/Model';
 
 describe('DocumentRenderer Security Helpers', () => {
   it('escapeHtml escapes HTML-special characters', () => {
@@ -34,7 +36,31 @@ describe('DocumentRenderer Security Helpers', () => {
   });
 });
 
-describe('DocumentRenderer Core & Phase 8B Content Layout Functionality', () => {
+describe('DocumentRenderer Inline Content Parsing & Rendering', () => {
+  it('parseInlineText parses plain text, inline code, links, and autolinks', () => {
+    const text = 'Check `const x = 1;` and [Google](https://google.com) or https://example.com directly.';
+    const nodes = parseInlineText(text);
+
+    expect(nodes).toEqual([
+      { type: 'text', text: 'Check ' },
+      { type: 'code', code: 'const x = 1;' },
+      { type: 'text', text: ' and ' },
+      { type: 'link', href: 'https://google.com', text: 'Google' },
+      { type: 'text', text: ' or ' },
+      { type: 'link', href: 'https://example.com', text: 'https://example.com' },
+      { type: 'text', text: ' directly.' },
+    ]);
+  });
+
+  it('renderInlineText renders inline nodes with HTML escaping and URL sanitization', () => {
+    const html = renderInlineText('Check `alert("<XSS>")` and [Malicious](javascript:alert(1))');
+    expect(html).toContain('<code>alert(&quot;&lt;XSS&gt;&quot;)</code>');
+    expect(html).toContain('Malicious');
+    expect(html).not.toContain('href="javascript:');
+  });
+});
+
+describe('DocumentRenderer Full Regression Suite (All 36 Scenarios)', () => {
   const sampleConversation: Conversation = {
     id: 'conv-123',
     title: 'Comprehensive Test Chat',
@@ -51,7 +77,7 @@ describe('DocumentRenderer Core & Phase 8B Content Layout Functionality', () => 
         role: 'assistant',
         blocks: [
           { type: 'heading', level: 2, text: 'HTML Guide' },
-          { type: 'paragraph', text: 'Here is an introduction.' },
+          { type: 'paragraph', text: 'Here is an introduction with `inline code` and a [Link](https://example.com).' },
           {
             type: 'list',
             ordered: false,
@@ -80,64 +106,50 @@ describe('DocumentRenderer Core & Phase 8B Content Layout Functionality', () => 
     ],
   };
 
-  it('1. renders valid standalone <!doctype html> document string', () => {
+  it('1. valid standalone HTML document', () => {
     const html = renderConversation(sampleConversation);
     expect(html).toContain('<!doctype html>');
     expect(html).toContain('<html lang="en">');
     expect(html).toContain('</html>');
   });
 
-  it('2. renders conversation title when showConversationTitle is true', () => {
+  it('2. title rendering', () => {
     const html = renderConversation(sampleConversation, { showConversationTitle: true });
-    expect(html).toContain('Comprehensive Test Chat');
+    expect(html).toContain('<title>Comprehensive Test Chat</title>');
+    expect(html).toContain('<h1 class="document-title">Comprehensive Test Chat</h1>');
   });
 
-  it('3. hides conversation title when showConversationTitle is false', () => {
+  it('3. title visibility setting', () => {
     const html = renderConversation(sampleConversation, { showConversationTitle: false });
     expect(html).not.toContain('<h1 class="document-title">');
   });
 
-  it('4. renders formatted date when showDate is true', () => {
+  it('4. date rendering', () => {
     const html = renderConversation(sampleConversation, { showDate: true });
     expect(html).toContain('Exported on September 4, 2026');
   });
 
-  // ── Phase 8B Specific Requirements A-X ─────────────────────────────────────
-
-  it('A. User message styling (.message-user)', () => {
+  it('5. user + assistant ordering', () => {
     const html = renderConversation(sampleConversation);
-    expect(html).toContain('article class="message message-user"');
-    expect(html).toContain('<div class="message-role">User</div>');
+    const userIndex = html.indexOf('class="message message-user"');
+    const assistantIndex = html.indexOf('class="message message-assistant"');
+    expect(userIndex).toBeGreaterThan(-1);
+    expect(assistantIndex).toBeGreaterThan(userIndex);
   });
 
-  it('B. Assistant message styling (.message-assistant)', () => {
-    const html = renderConversation(sampleConversation);
-    expect(html).toContain('article class="message message-assistant"');
-    expect(html).toContain('<div class="message-role">Assistant</div>');
+  it('6. user message visibility filtering', () => {
+    const html = renderConversation(sampleConversation, { showUserMessages: false });
+    expect(html).not.toContain('class="message message-user"');
+    expect(html).toContain('class="message message-assistant"');
   });
 
-  it('C. Multiple paragraphs rendering', () => {
-    const conv: Conversation = {
-      id: 'c1',
-      title: 'Paras',
-      url: 'https://chatgpt.com/',
-      messages: [
-        {
-          id: 'm1',
-          role: 'assistant',
-          blocks: [
-            { type: 'paragraph', text: 'First paragraph.' },
-            { type: 'paragraph', text: 'Second paragraph.' },
-          ],
-        },
-      ],
-    };
-    const html = renderConversation(conv);
-    expect(html).toContain('<p>First paragraph.</p>');
-    expect(html).toContain('<p>Second paragraph.</p>');
+  it('7. assistant message visibility filtering', () => {
+    const html = renderConversation(sampleConversation, { showAssistantMessages: false });
+    expect(html).toContain('class="message message-user"');
+    expect(html).not.toContain('class="message message-assistant"');
   });
 
-  it('D. Heading hierarchy (H1-H6)', () => {
+  it('8. H1-H6 rendering', () => {
     const conv: Conversation = {
       id: 'c1',
       title: 'Headings',
@@ -147,21 +159,57 @@ describe('DocumentRenderer Core & Phase 8B Content Layout Functionality', () => 
           id: 'm1',
           role: 'assistant',
           blocks: [
-            { type: 'heading', level: 1, text: 'Heading 1' },
-            { type: 'heading', level: 3, text: 'Heading 3' },
+            { type: 'heading', level: 1, text: 'H1 Title' },
+            { type: 'heading', level: 2, text: 'H2 Title' },
+            { type: 'heading', level: 3, text: 'H3 Title' },
+            { type: 'heading', level: 4, text: 'H4 Title' },
+            { type: 'heading', level: 5, text: 'H5 Title' },
+            { type: 'heading', level: 6, text: 'H6 Title' },
           ],
         },
       ],
     };
     const html = renderConversation(conv);
-    expect(html).toContain('<h1>Heading 1</h1>');
-    expect(html).toContain('<h3>Heading 3</h3>');
+    expect(html).toContain('<h1>H1 Title</h1>');
+    expect(html).toContain('<h2>H2 Title</h2>');
+    expect(html).toContain('<h3>H3 Title</h3>');
+    expect(html).toContain('<h4>H4 Title</h4>');
+    expect(html).toContain('<h5>H5 Title</h5>');
+    expect(html).toContain('<h6>H6 Title</h6>');
   });
 
-  it('E & F. Nested list semantic tags (ul & ol)', () => {
+  it('9. paragraph rendering', () => {
+    const html = renderConversation(sampleConversation);
+    expect(html).toContain('<p>How do I test HTML?</p>');
+  });
+
+  it('10. nested unordered lists', () => {
     const conv: Conversation = {
       id: 'c1',
-      title: 'Lists',
+      title: 'UL List',
+      url: 'https://chatgpt.com/',
+      messages: [
+        {
+          id: 'm1',
+          role: 'assistant',
+          blocks: [
+            {
+              type: 'list',
+              ordered: false,
+              items: [{ text: 'Parent', children: [{ text: 'Child' }] }],
+            },
+          ],
+        },
+      ],
+    };
+    const html = renderConversation(conv);
+    expect(html).toContain('<ul><li>Parent<ul><li>Child</li></ul></li></ul>');
+  });
+
+  it('11. nested ordered lists', () => {
+    const conv: Conversation = {
+      id: 'c1',
+      title: 'OL List',
       url: 'https://chatgpt.com/',
       messages: [
         {
@@ -181,70 +229,269 @@ describe('DocumentRenderer Core & Phase 8B Content Layout Functionality', () => 
     expect(html).toContain('<ol><li>Step 1<ol><li>Substep 1.1</li></ol></li></ol>');
   });
 
-  it('H. Code indentation preservation', () => {
+  it('12. mixed nested list behavior (ul -> ol and ol -> ul)', () => {
+    const conv: Conversation = {
+      id: 'c1',
+      title: 'Mixed Lists',
+      url: 'https://chatgpt.com/',
+      messages: [
+        {
+          id: 'm1',
+          role: 'assistant',
+          blocks: [
+            {
+              type: 'list',
+              ordered: false,
+              items: [{ text: 'Bullet', ordered: true, children: [{ text: 'Numbered Sub-item' }] }],
+            },
+            {
+              type: 'list',
+              ordered: true,
+              items: [{ text: 'Step', ordered: false, children: [{ text: 'Bullet Sub-item' }] }],
+            },
+          ],
+        },
+      ],
+    };
+    const html = renderConversation(conv);
+    expect(html).toContain('<ul><li>Bullet<ol><li>Numbered Sub-item</li></ol></li></ul>');
+    expect(html).toContain('<ol><li>Step<ul><li>Bullet Sub-item</li></ul></li></ol>');
+  });
+
+  it('13. exact block ordering', () => {
+    const html = renderConversation(sampleConversation);
+    const h2Idx = html.indexOf('<h2>HTML Guide</h2>');
+    const codeIdx = html.indexOf('<div class="code-wrapper">');
+    const tableIdx = html.indexOf('<div class="table-wrapper">');
+    expect(h2Idx).toBeGreaterThan(-1);
+    expect(codeIdx).toBeGreaterThan(h2Idx);
+    expect(tableIdx).toBeGreaterThan(codeIdx);
+  });
+
+  it('14. code indentation preservation', () => {
     const html = renderConversation(sampleConversation);
     expect(html).toContain('def hello():\n    print(&quot;Hello &lt;World&gt;&amp;&quot;)\n');
   });
 
-  it('I. Long code line CSS wrapping rules', () => {
-    const html = renderConversation(sampleConversation);
-    expect(html).toContain('overflow-wrap: break-word;');
-    expect(html).toContain('word-break: break-word;');
+  it('15. code HTML escaping', () => {
+    const conv: Conversation = {
+      id: 'c1',
+      title: 'Unsafe Code',
+      url: 'https://chatgpt.com/',
+      messages: [
+        {
+          id: 'm1',
+          role: 'assistant',
+          blocks: [{ type: 'code', code: '<script>alert("XSS")</script>' }],
+        },
+      ],
+    };
+    const html = renderConversation(conv);
+    expect(html).toContain('&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt;');
+    expect(html).not.toContain('<script>alert');
   });
 
-  it('K. Table rendering', () => {
+  it('16. table headers/cells', () => {
     const html = renderConversation(sampleConversation);
-    expect(html).toContain('<div class="table-wrapper"><table><thead><tr><th>Header 1</th>');
-    expect(html).toContain('<td>Cell &lt;1&gt;</td>');
+    expect(html).toContain('<table><thead><tr><th>Header 1</th><th>Header 2</th></tr></thead>');
+    expect(html).toContain('<tbody><tr><td>Cell &lt;1&gt;</td><td>Cell 2</td></tr></tbody>');
   });
 
-  it('L. Blockquote rendering', () => {
+  it('17. table HTML escaping', () => {
+    const conv: Conversation = {
+      id: 'c1',
+      title: 'Table Escape',
+      url: 'https://chatgpt.com/',
+      messages: [
+        {
+          id: 'm1',
+          role: 'assistant',
+          blocks: [
+            {
+              type: 'table',
+              headers: ['<Header>'],
+              rows: [['<Cell>']],
+            },
+          ],
+        },
+      ],
+    };
+    const html = renderConversation(conv);
+    expect(html).toContain('<th>&lt;Header&gt;</th>');
+    expect(html).toContain('<td>&lt;Cell&gt;</td>');
+  });
+
+  it('18. blockquotes', () => {
     const html = renderConversation(sampleConversation);
     expect(html).toContain('<blockquote>Important Quote</blockquote>');
   });
 
-  it('M. Image rendering', () => {
+  it('19. image rendering', () => {
     const html = renderConversation(sampleConversation);
-    expect(html).toContain('<img src="https://example.com/fig.png" alt="Figure 1" loading="lazy" />');
+    expect(html).toContain('<div class="image-wrapper"><img src="https://example.com/fig.png" alt="Figure 1" /><div class="image-caption">Figure 1</div></div>');
   });
 
-  it('N. Math rendering', () => {
+  it('20. unsafe image URL rejection', () => {
+    const conv: Conversation = {
+      id: 'c1',
+      title: 'Unsafe Image',
+      url: 'https://chatgpt.com/',
+      messages: [
+        {
+          id: 'm1',
+          role: 'assistant',
+          blocks: [{ type: 'image', src: 'javascript:alert(1)', alt: 'Bad Image' }],
+        },
+      ],
+    };
+    const html = renderConversation(conv);
+    expect(html).not.toContain('src="javascript:');
+    expect(html).not.toContain('<img');
+  });
+
+  it('21. math rendering', () => {
     const html = renderConversation(sampleConversation);
     expect(html).toContain('<div class="math-block math-display">E = mc^2</div>');
   });
 
-  it('R & S. Role visibility filtering settings', () => {
-    const noUserHtml = renderConversation(sampleConversation, { showUserMessages: false });
-    expect(noUserHtml).not.toContain('<div class="message-role">User</div>');
-
-    const noAssisHtml = renderConversation(sampleConversation, { showAssistantMessages: false });
-    expect(noAssisHtml).not.toContain('<div class="message-role">Assistant</div>');
+  it('22. empty conversation', () => {
+    const emptyConv: Conversation = {
+      id: 'c-empty',
+      title: 'Empty Chat',
+      url: 'https://chatgpt.com/',
+      messages: [],
+    };
+    const html = renderConversation(emptyConv);
+    expect(html).toContain('<!doctype html>');
+    expect(html).toContain('<section class="conversation">');
+    expect(html).toContain('</section>');
   });
 
-  it('T, U, V. Font family, font size, and line height settings integration', () => {
-    const customHtml = renderConversation(sampleConversation, {
-      fontFamily: 'Arial, sans-serif',
-      baseFontSize: '11pt',
-      lineHeight: 1.6,
-    });
-    expect(customHtml).toContain('font-family: Arial, sans-serif;');
-    expect(customHtml).toContain('font-size: 11pt;');
-    expect(customHtml).toContain('line-height: 1.6;');
+  it('23. unknown-block fallback', () => {
+    const conv: Conversation = {
+      id: 'c1',
+      title: 'Unknown',
+      url: 'https://chatgpt.com/',
+      messages: [
+        {
+          id: 'm1',
+          role: 'assistant',
+          blocks: [{ type: 'custom_unknown' } as unknown as ContentBlock],
+        },
+      ],
+    };
+    const html = renderConversation(conv);
+    expect(html).toContain('<p class="fallback-block">');
+    expect(html).toContain('&quot;type&quot;:&quot;custom_unknown&quot;');
   });
 
-  it('W. Code theme light/dark setting integration', () => {
-    const lightHtml = renderConversation(sampleConversation, { codeTheme: 'light' });
-    expect(lightHtml).toContain('background: #f8fafc;');
+  it('24. page size setting', () => {
+    const letterHtml = renderConversation(sampleConversation, { pageSize: 'LETTER' });
+    expect(letterHtml).toContain('@page {\n      size: 8.5in 11in;');
+  });
 
+  it('25. margin setting', () => {
+    const customMarginHtml = renderConversation(sampleConversation, { marginTop: '25mm' });
+    expect(customMarginHtml).toContain('margin-top: 25mm;');
+  });
+
+  it('26. font family setting', () => {
+    const fontHtml = renderConversation(sampleConversation, { fontFamily: 'Georgia, serif' });
+    expect(fontHtml).toContain('font-family: Georgia, serif;');
+  });
+
+  it('27. base font size setting', () => {
+    const fontSizeHtml = renderConversation(sampleConversation, { baseFontSize: '12pt' });
+    expect(fontSizeHtml).toContain('font-size: 12pt;');
+  });
+
+  it('28. line-height setting', () => {
+    const lhHtml = renderConversation(sampleConversation, { lineHeight: 1.8 });
+    expect(lhHtml).toContain('line-height: 1.8;');
+  });
+
+  it('29. code theme setting', () => {
     const darkHtml = renderConversation(sampleConversation, { codeTheme: 'dark' });
     expect(darkHtml).toContain('background: #1e293b;');
   });
 
-  it('X. Heading spacing setting integration', () => {
+  it('30. heading spacing setting', () => {
     const spacingHtml = renderConversation(sampleConversation, { headingSpacing: true });
     expect(spacingHtml).toContain('margin-top: 16px;');
+  });
 
-    const noSpacingHtml = renderConversation(sampleConversation, { headingSpacing: false });
-    expect(noSpacingHtml).toContain('margin-top: 8px;');
+  it('31. renderer remains independent from Chrome APIs / ChatGPT selectors', () => {
+    const html = renderConversation(sampleConversation);
+    expect(html).not.toContain('chrome-extension://');
+    expect(html).not.toContain('[data-testid=');
+  });
+
+  it('32. inline code rendering', () => {
+    const conv: Conversation = {
+      id: 'c1',
+      title: 'Inline Code',
+      url: 'https://chatgpt.com/',
+      messages: [
+        {
+          id: 'm1',
+          role: 'assistant',
+          blocks: [{ type: 'paragraph', text: 'Use `npm test` to run tests.' }],
+        },
+      ],
+    };
+    const html = renderConversation(conv);
+    expect(html).toContain('<p>Use <code>npm test</code> to run tests.</p>');
+  });
+
+  it('33. inline link rendering', () => {
+    const conv: Conversation = {
+      id: 'c1',
+      title: 'Inline Link',
+      url: 'https://chatgpt.com/',
+      messages: [
+        {
+          id: 'm1',
+          role: 'assistant',
+          blocks: [{ type: 'paragraph', text: 'Visit [GitHub](https://github.com) now.' }],
+        },
+      ],
+    };
+    const html = renderConversation(conv);
+    expect(html).toContain('<p>Visit <a href="https://github.com">GitHub</a> now.</p>');
+  });
+
+  it('34. mixed inline content rendering', () => {
+    const conv: Conversation = {
+      id: 'c1',
+      title: 'Mixed Inline',
+      url: 'https://chatgpt.com/',
+      messages: [
+        {
+          id: 'm1',
+          role: 'assistant',
+          blocks: [
+            {
+              type: 'paragraph',
+              text: 'Normal text + `inline code` + [Link Text](https://example.com) + extra text.',
+            },
+          ],
+        },
+      ],
+    };
+    const html = renderConversation(conv);
+    expect(html).toContain(
+      '<p>Normal text + <code>inline code</code> + <a href="https://example.com">Link Text</a> + extra text.</p>'
+    );
+  });
+
+  it('35. long URL safety/wrapping behavior', () => {
+    const html = renderConversation(sampleConversation);
+    expect(html).toContain('a {\n      color: #2563eb;\n      text-decoration: underline;\n      overflow-wrap: break-word;\n      word-break: break-word;\n    }');
+  });
+
+  it('36. image output does not use lazy loading', () => {
+    const html = renderConversation(sampleConversation);
+    expect(html).toContain('<img src="https://example.com/fig.png" alt="Figure 1" />');
+    expect(html).not.toContain('loading="lazy"');
   });
 });

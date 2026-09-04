@@ -26,6 +26,7 @@ import {
   TableBlock,
   ImageBlock,
   MathBlock,
+  InlineNode,
 } from '../conversation/Model';
 
 import { RenderOptions, DEFAULT_RENDER_OPTIONS } from './RenderTypes';
@@ -88,10 +89,84 @@ export function formatDate(isoString: string | undefined): string {
 }
 
 /**
+ * Render individual InlineNode to HTML string with security escaping and URL sanitization.
+ */
+function renderInlineNode(node: InlineNode): string {
+  switch (node.type) {
+    case 'text':
+      return escapeHtml(node.text);
+    case 'code':
+      return `<code>${escapeHtml(node.code)}</code>`;
+    case 'link': {
+      const safeHref = sanitizeUrl(node.href);
+      const linkText = escapeHtml(node.text || node.href);
+      if (safeHref) {
+        return `<a href="${safeHref}">${linkText}</a>`;
+      }
+      return linkText;
+    }
+  }
+}
+
+/**
+ * Parses plain text string for inline markdown code, markdown links, or raw URLs.
+ * Deterministic fallback parser when explicit `inlines` array is not provided.
+ */
+export function parseInlineText(text: string): InlineNode[] {
+  if (!text) return [];
+
+  const nodes: InlineNode[] = [];
+  const inlineRegex = /(`[^`\n]+`)|(\[([^\]]+)\]\(([^)\s]+)\))|(https?:\/\/[^\s<]+)/g;
+
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = inlineRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push({ type: 'text', text: text.slice(lastIndex, match.index) });
+    }
+
+    if (match[1]) {
+      const codeContent = match[1].slice(1, -1);
+      nodes.push({ type: 'code', code: codeContent });
+    } else if (match[2]) {
+      const linkText = match[3];
+      const linkUrl = match[4];
+      nodes.push({ type: 'link', href: linkUrl, text: linkText });
+    } else if (match[5]) {
+      const url = match[5];
+      nodes.push({ type: 'link', href: url, text: url });
+    }
+
+    lastIndex = inlineRegex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    nodes.push({ type: 'text', text: text.slice(lastIndex) });
+  }
+
+  return nodes;
+}
+
+/**
+ * Renders inline content as HTML string, using explicit inlines if present or parsing text.
+ */
+export function renderInlineText(text: string, inlines?: readonly InlineNode[]): string {
+  if (inlines && inlines.length > 0) {
+    return inlines.map(renderInlineNode).join('');
+  }
+  const nodes = parseInlineText(text);
+  if (nodes.length === 0) {
+    return escapeHtml(text);
+  }
+  return nodes.map(renderInlineNode).join('');
+}
+
+/**
  * Render a single paragraph block.
  */
 function renderParagraph(block: ParagraphBlock): string {
-  return `<p>${escapeHtml(block.text)}</p>`;
+  return `<p>${renderInlineText(block.text, block.inlines)}</p>`;
 }
 
 /**
@@ -99,7 +174,7 @@ function renderParagraph(block: ParagraphBlock): string {
  */
 function renderHeading(block: HeadingBlock): string {
   const level = block.level >= 1 && block.level <= 6 ? block.level : 2;
-  return `<h${level}>${escapeHtml(block.text)}</h${level}>`;
+  return `<h${level}>${renderInlineText(block.text, block.inlines)}</h${level}>`;
 }
 
 /**
@@ -123,13 +198,14 @@ function renderCode(block: CodeBlock): string {
 function renderListItems(items: readonly ListItem[], parentOrdered: boolean = false): string {
   return items
     .map((item) => {
-      const itemText = escapeHtml(item.text);
+      const itemHtml = renderInlineText(item.text, item.inlines);
       let childList = '';
       if (item.children && item.children.length > 0) {
-        const tag = parentOrdered ? 'ol' : 'ul';
-        childList = `<${tag}>${renderListItems(item.children, parentOrdered)}</${tag}>`;
+        const isChildOrdered = item.ordered !== undefined ? item.ordered : parentOrdered;
+        const tag = isChildOrdered ? 'ol' : 'ul';
+        childList = `<${tag}>${renderListItems(item.children, isChildOrdered)}</${tag}>`;
       }
-      return `<li>${itemText}${childList}</li>`;
+      return `<li>${itemHtml}${childList}</li>`;
     })
     .join('');
 }
@@ -146,7 +222,7 @@ function renderList(block: ListBlock): string {
  * Render a blockquote block.
  */
 function renderQuote(block: QuoteBlock): string {
-  return `<blockquote>${escapeHtml(block.text)}</blockquote>`;
+  return `<blockquote>${renderInlineText(block.text, block.inlines)}</blockquote>`;
 }
 
 /**
@@ -155,7 +231,7 @@ function renderQuote(block: QuoteBlock): string {
 function renderTable(block: TableBlock): string {
   const headersHtml =
     block.headers.length > 0
-      ? `<thead><tr>${block.headers.map((h) => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>`
+      ? `<thead><tr>${block.headers.map((h) => `<th>${renderInlineText(h)}</th>`).join('')}</tr></thead>`
       : '';
 
   const rowsHtml =
@@ -163,7 +239,7 @@ function renderTable(block: TableBlock): string {
       ? `<tbody>${block.rows
           .map(
             (row) =>
-              `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`
+              `<tr>${row.map((cell) => `<td>${renderInlineText(cell)}</td>`).join('')}</tr>`
           )
           .join('')}</tbody>`
       : '';
@@ -174,6 +250,7 @@ function renderTable(block: TableBlock): string {
 /**
  * Render an image block.
  * Responsive sizing max-width:100%; height:auto;.
+ * NOTE: loading="lazy" is intentionally omitted so print/PDF generation renders images reliably.
  */
 function renderImage(block: ImageBlock): string {
   const safeSrc = sanitizeUrl(block.src);
@@ -184,7 +261,7 @@ function renderImage(block: ImageBlock): string {
     ? `<div class="image-caption">${escapeHtml(block.alt)}</div>`
     : '';
 
-  return `<div class="image-wrapper"><img src="${safeSrc}"${altHtml} loading="lazy" />${captionHtml}</div>`;
+  return `<div class="image-wrapper"><img src="${safeSrc}"${altHtml} />${captionHtml}</div>`;
 }
 
 /**

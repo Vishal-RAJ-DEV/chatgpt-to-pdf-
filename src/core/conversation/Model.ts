@@ -20,12 +20,33 @@ export type ContentBlockType =
   | 'image'
   | 'math';
 
+export type InlineNodeType = 'text' | 'code' | 'link';
+
+export interface TextInlineNode {
+  readonly type: 'text';
+  readonly text: string;
+}
+
+export interface CodeInlineNode {
+  readonly type: 'code';
+  readonly code: string;
+}
+
+export interface LinkInlineNode {
+  readonly type: 'link';
+  readonly href: string;
+  readonly text: string;
+}
+
+export type InlineNode = TextInlineNode | CodeInlineNode | LinkInlineNode;
+
 /**
  * Paragraph block containing semantic text content.
  */
 export interface ParagraphBlock {
   readonly type: 'paragraph';
   readonly text: string;
+  readonly inlines?: readonly InlineNode[];
 }
 
 /**
@@ -35,6 +56,7 @@ export interface HeadingBlock {
   readonly type: 'heading';
   readonly level: 1 | 2 | 3 | 4 | 5 | 6;
   readonly text: string;
+  readonly inlines?: readonly InlineNode[];
 }
 
 /**
@@ -51,6 +73,8 @@ export interface CodeBlock {
  */
 export interface ListItem {
   readonly text: string;
+  readonly inlines?: readonly InlineNode[];
+  readonly ordered?: boolean;
   readonly children?: readonly ListItem[];
 }
 
@@ -69,6 +93,7 @@ export interface ListBlock {
 export interface QuoteBlock {
   readonly type: 'quote';
   readonly text: string;
+  readonly inlines?: readonly InlineNode[];
 }
 
 /**
