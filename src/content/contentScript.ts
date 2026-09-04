@@ -7,7 +7,7 @@
  */
 
 import { checkHealth } from '../adapters/chatgpt/healthCheck';
-import { extractConversation, ExtractionError } from '../core/conversation/Extractor';
+import { extractConversationAsync, ExtractionError } from '../core/conversation/Extractor';
 import { logger } from '../utils/logger';
 
 logger.info('ChatGPT Exporter content script loaded.');
@@ -29,24 +29,26 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
     }
 
     if (action === 'EXTRACT_CONVERSATION') {
-      try {
-        const conversation = extractConversation();
-        sendResponse({ success: true, conversation });
-      } catch (err) {
-        if (err instanceof ExtractionError) {
-          sendResponse({
-            success: false,
-            error: err.message,
-            code: err.code,
-          });
-        } else {
-          sendResponse({
-            success: false,
-            error: err instanceof Error ? err.message : String(err),
-            code: 'EXTRACTION_FAILED',
-          });
+      (async () => {
+        try {
+          const conversation = await extractConversationAsync();
+          sendResponse({ success: true, conversation });
+        } catch (err) {
+          if (err instanceof ExtractionError) {
+            sendResponse({
+              success: false,
+              error: err.message,
+              code: err.code,
+            });
+          } else {
+            sendResponse({
+              success: false,
+              error: err instanceof Error ? err.message : String(err),
+              code: 'EXTRACTION_FAILED',
+            });
+          }
         }
-      }
+      })();
       return true;
     }
 

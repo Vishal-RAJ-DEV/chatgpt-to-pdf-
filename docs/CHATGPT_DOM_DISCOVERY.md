@@ -241,3 +241,16 @@ When OpenAI updates the front-end layout of `chatgpt.com`, follow this diagnosti
 4. **Update DOM Fixtures**: Add a new static HTML snapshot under `tests/fixtures/html/chatgpt-v3-{year}.html`.
 5. **Update Adapter Unit Tests**: Add test assertions in `tests/unit/ChatGPTAdapter.test.ts` to verify the new fixture.
 6. **Deploy Production Logic**: Update extractor logic only after all fixture unit tests pass.
+
+---
+
+## 17. Long Conversations & Virtualized Container Behavior (Phase 7)
+
+For conversations exceeding ~20–30 turns, ChatGPT unmounts off-screen turn nodes from the DOM to maintain rendering performance.
+
+### Discovered Behavior
+- **Scroll Container**: The primary scroll container is the ancestor element containing `[data-testid="conversation-turns-container"]` with `overflow-y: auto | scroll`.
+- **Node Lifecycle**: Nodes above or below the active viewport window are unmounted from the DOM tree.
+- **Turn Re-identification**: Unmounted turns remount with stable `data-message-id` and `data-testid="conversation-turn-N"` attributes when scrolled back into view.
+- **Traversal Strategy**: The extension performs incremental upward scroll steps (-400px per step), waits for DOM mutations using `MutationObserver`, collects newly mounted turn nodes, and deduplicates them using `data-message-id` or content hashes before restoring user scroll position.
+

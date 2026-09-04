@@ -25,13 +25,14 @@
 |                           ChatGPT Adapter                             |
 |  - Encapsulates DOM selectors & fallback strategies                   |
 |  - Locates conversation container, message turns, & roles             |
-|  - Health checks & DOM structure validation                           |
+|  - ConversationScroller & DOM mutation watcher                        |
 +-----------------------------------------------------------------------+
                                     |
                                     v
 +-----------------------------------------------------------------------+
-|                        Conversation Extractor                         |
-|  - Parses message node DOM elements                                   |
+|                    Long Conversation Extractor                        |
+|  - Virtualized DOM traversal & incremental scrolling                  |
+|  - Deterministic turn deduplication & order reconstruction            |
 |  - Converts raw DOM nodes into abstract ContentBlock primitives       |
 +-----------------------------------------------------------------------+
                                     |
@@ -392,5 +393,6 @@ export interface ExportSettings {
 - **Phase 3C (Complete)**: Rich Content Extraction Engine (paragraphs, headings, lists, code, tables, quotes, images, math).
 - **Phase 4 (Complete)**: Document Renderer (pure HTML document generator, CSS print rules, security escaping, role filtering).
 - **Phase 6 (Complete)**: Local Browser PDF Generation & Extension Export UI (ExportService, PrintService, Popup UI).
-- **Phase 7 (Pending)**: Long-conversation scrolling & virtualization handling.
+- **Phase 6.1 (Complete)**: Export Pipeline Hardening (stage error boundaries, popup feedback, window cleanup).
+- **Phase 7 (Complete)**: Long-conversation scrolling & virtualization handling (ConversationScroller, LongConversationExtractor, deduplication).
 

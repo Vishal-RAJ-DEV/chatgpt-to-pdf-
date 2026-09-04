@@ -121,6 +121,7 @@ export interface ExtractionMetadata {
   readonly extractedAt: string;
   readonly adapterVersion: string;
   readonly confidence: 'high' | 'medium' | 'low';
+  readonly completeness?: 'complete' | 'uncertain';
 }
 
 /**

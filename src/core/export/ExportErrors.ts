@@ -15,6 +15,7 @@ export enum ExportErrorCode {
   PRINT_FAILED = 'PRINT_FAILED',
   PRINT_TIMEOUT = 'PRINT_TIMEOUT',
   EXPORT_IN_PROGRESS = 'EXPORT_IN_PROGRESS',
+  CONVERSATION_INCOMPLETE = 'CONVERSATION_INCOMPLETE',
 }
 
 const ERROR_USER_MESSAGES: Record<ExportErrorCode, string> = {
@@ -27,6 +28,7 @@ const ERROR_USER_MESSAGES: Record<ExportErrorCode, string> = {
   [ExportErrorCode.PRINT_FAILED]: 'Could not open browser print dialog. Please try again.',
   [ExportErrorCode.PRINT_TIMEOUT]: 'Print preparation timed out. Please try again.',
   [ExportErrorCode.EXPORT_IN_PROGRESS]: 'An export is already running. Please wait.',
+  [ExportErrorCode.CONVERSATION_INCOMPLETE]: 'Could not collect the complete conversation. Please try again.',
 };
 
 export class ExportError extends Error {

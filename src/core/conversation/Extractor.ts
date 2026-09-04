@@ -37,7 +37,9 @@ export type ExtractionErrorCode =
   | 'UNSUPPORTED_HOST'
   | 'STREAMING_IN_PROGRESS'
   | 'CONVERSATION_NOT_FOUND'
-  | 'NO_TURNS_FOUND';
+  | 'NO_TURNS_FOUND'
+  | 'INCOMPLETE_CONVERSATION'
+  | 'LONG_CONVERSATION_TIMEOUT';
 
 /**
  * Typed error thrown when conversation extraction cannot proceed safely.
@@ -172,4 +174,16 @@ export function extractConversation(
     messages,
     metadata,
   };
+}
+
+/**
+ * Asynchronous long-conversation extractor supporting virtualized DOM structures.
+ */
+export async function extractConversationAsync(
+  root: Document | Element = typeof document !== 'undefined' ? document : (null as unknown as Document),
+  urlPath: string = typeof window !== 'undefined' ? window.location.pathname : ''
+): Promise<Conversation> {
+  const { LongConversationExtractor } = await import('./LongConversationExtractor');
+  const extractor = new LongConversationExtractor();
+  return extractor.extractLongConversation(root, urlPath);
 }

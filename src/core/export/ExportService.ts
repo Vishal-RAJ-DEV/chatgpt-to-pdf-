@@ -232,6 +232,9 @@ export class ExportService {
             response?.code === 'CONVERSATION_NOT_FOUND') {
           throw new ExportError(ExportErrorCode.CONVERSATION_NOT_FOUND);
         }
+        if (response?.code === 'INCOMPLETE_CONVERSATION' || response?.code === 'LONG_CONVERSATION_TIMEOUT') {
+          throw new ExportError(ExportErrorCode.CONVERSATION_INCOMPLETE);
+        }
         throw new ExportError(ExportErrorCode.EXTRACTION_FAILED, response?.error);
       }
 
