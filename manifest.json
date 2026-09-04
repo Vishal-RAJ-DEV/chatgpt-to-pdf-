@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "ChatGPT PDF Exporter",
+  "version": "0.1.0",
+  "description": "Export ChatGPT conversations as clean, professionally formatted PDFs locally and securely.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*"
+  ],
+  "action": {
+    "default_title": "Export ChatGPT to PDF"
+  }
+}

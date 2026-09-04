@@ -1,0 +1,19 @@
+{
+  "name": "chatgpt-pdf-exporter",
+  "version": "0.1.0",
+  "description": "Chrome Manifest V3 Extension to export ChatGPT conversations into clean, local PDFs.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.308",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "vitest": "^2.1.0"
+  }
+}
