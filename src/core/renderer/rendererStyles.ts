@@ -232,12 +232,7 @@ export function generateDocumentStyles(options: RenderOptions): string {
       overflow-x: auto;
     }
 
-    pre code {
-      font-family: inherit;
-      font-size: inherit;
-    }
-
-    /* Inline Code */
+    /* Inline Code — pill styling with background, padding and border-radius */
     code {
       font-family: ${tokens.typography.fontFamilyCode};
       font-size: 0.9em;
@@ -245,6 +240,19 @@ export function generateDocumentStyles(options: RenderOptions): string {
       color: ${isDarkCode ? tokens.colors.codeInlineDarkText : tokens.colors.codeInlineLightText};
       padding: 2px 5px;
       border-radius: ${tokens.spacing.borderRadiusSmall};
+    }
+
+    /* Fenced Code — reset inline-code pill styling so the pre block theme controls appearance.
+       background: transparent lets the parent pre background show through;
+       color: inherit uses the pre text color (codeDarkText / codeLightText);
+       padding/border-radius: 0 remove the per-line pill boxes visible in the PDF. */
+    pre code {
+      font-family: inherit;
+      font-size: inherit;
+      background: transparent;
+      color: inherit;
+      padding: 0;
+      border-radius: 0;
     }
 
     /* ── Tables ──────────────────────────────────────────────────────────── */

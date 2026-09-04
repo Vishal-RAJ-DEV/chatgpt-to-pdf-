@@ -753,3 +753,120 @@ describe('Phase 8E Visual Tokens & Reference PDF Visual Matching', () => {
     expect(html).toContain('.message-body {\n      display: block;\n    }');
   });
 });
+
+describe('Phase 13 Correction #3 — Inline vs Fenced Code CSS Isolation', () => {
+  /**
+   * Regression suite for the CSS specificity bug where the global `code` rule's
+   * inline-pill styling (background, color, padding, border-radius) leaked into
+   * fenced code blocks (`pre code`).
+   *
+   * The generated CSS must satisfy these invariants:
+   *  A. `code { ... background: <color>; padding: 2px 5px; border-radius: 4px; }`
+   *     — inline code has pill styling
+   *  B. `pre code { ... background: transparent; color: inherit; padding: 0; border-radius: 0; }`
+   *     — fenced code explicitly resets pill styling
+   *  C. `pre code` must appear AFTER `code` in source order so the
+   *     more-specific selector wins in the cascade.
+   */
+
+  const conv: Conversation = {
+    id: 'c-code-isolation',
+    title: 'Code Isolation Test',
+    url: 'https://chatgpt.com/c/code-isolation',
+    messages: [
+      {
+        id: 'm1',
+        role: 'assistant',
+        blocks: [
+          { type: 'paragraph', text: 'Use `Redis` for caching.' },
+          {
+            type: 'code',
+            language: 'text',
+            code: 'Player A\n  |\n  v\nNexus Arena\n  |\n  v\nPlayer B',
+          },
+        ],
+      },
+    ],
+  };
+
+  it('1. dark theme: inline code retains background, padding, border-radius', () => {
+    const html = renderConversation(conv, { codeTheme: 'dark' });
+
+    // Inline code rule must have the dark inline background (#334155)
+    expect(html).toContain('background: #334155;');
+    expect(html).toContain('padding: 2px 5px;');
+    expect(html).toContain('border-radius: 4px;');
+  });
+
+  it('2. dark theme: pre code resets background, color, padding, border-radius', () => {
+    const html = renderConversation(conv, { codeTheme: 'dark' });
+
+    // The pre code override must be present with all four reset properties
+    expect(html).toContain('pre code {');
+    expect(html).toContain('background: transparent;');
+    expect(html).toContain('color: inherit;');
+    expect(html).toContain('padding: 0;');
+    expect(html).toContain('border-radius: 0;');
+  });
+
+  it('3. light theme: inline code retains background, padding, border-radius', () => {
+    const html = renderConversation(conv, { codeTheme: 'light' });
+
+    // Inline code rule must have the light inline background (#f1f5f9)
+    expect(html).toContain('background: #f1f5f9;');
+    expect(html).toContain('padding: 2px 5px;');
+    expect(html).toContain('border-radius: 4px;');
+  });
+
+  it('4. light theme: pre code resets background, color, padding, border-radius', () => {
+    const html = renderConversation(conv, { codeTheme: 'light' });
+
+    expect(html).toContain('pre code {');
+    expect(html).toContain('background: transparent;');
+    expect(html).toContain('color: inherit;');
+    expect(html).toContain('padding: 0;');
+    expect(html).toContain('border-radius: 0;');
+  });
+
+  it('5. pre code override appears AFTER the code rule in source order (cascade correctness)', () => {
+    const html = renderConversation(conv, { codeTheme: 'dark' });
+
+    // The inline `code {` block must come before `pre code {` in the CSS
+    const codeRuleIdx = html.indexOf('\n    code {');
+    const preCodeRuleIdx = html.indexOf('\n    pre code {');
+
+    expect(codeRuleIdx).toBeGreaterThan(-1);
+    expect(preCodeRuleIdx).toBeGreaterThan(-1);
+    expect(preCodeRuleIdx).toBeGreaterThan(codeRuleIdx);
+  });
+
+  it('6. fenced code block HTML structure uses pre > code', () => {
+    const html = renderConversation(conv);
+
+    // The rendered fenced block must be a pre containing a code element
+    expect(html).toContain('<pre>');
+    expect(html).toContain('<code>');
+    expect(html).toContain('Player A');
+    expect(html).toContain('Nexus Arena');
+    expect(html).toContain('Player B');
+  });
+
+  it('7. inline code HTML structure uses bare code (not inside pre)', () => {
+    const html = renderConversation(conv);
+
+    // Inline code must render as <code> inside a paragraph
+    expect(html).toContain('<p>Use <code>Redis</code> for caching.</p>');
+  });
+
+  it('8. pre background and color tokens are unaffected by the fix', () => {
+    const darkHtml = renderConversation(conv, { codeTheme: 'dark' });
+    // Dark pre must still use the dark background and text tokens
+    expect(darkHtml).toContain('background: #1e293b;'); // codeDarkBg
+    expect(darkHtml).toContain('color: #e2e8f0;');      // codeDarkText
+
+    const lightHtml = renderConversation(conv, { codeTheme: 'light' });
+    // Light pre must still use the light background and text tokens
+    expect(lightHtml).toContain('background: #f8fafc;'); // codeLightBg
+    expect(lightHtml).toContain('color: #0f172a;');       // codeLightText
+  });
+});
