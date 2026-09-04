@@ -93,8 +93,9 @@ describe('PopupUI Hardening & Error Boundary Unit Tests', () => {
     await popup.handleExport();
 
     const statusBox = popup.getElement<HTMLDivElement>('status-box');
-    expect(statusBox?.textContent).toBe('PDF export failed.');
+    expect(statusBox?.textContent).toBe('PDF export failed. Please try again.');
     expect(statusBox?.className).toContain('error');
+
 
     const exportBtn = popup.getElement<HTMLButtonElement>('export-btn');
     expect(exportBtn?.disabled).toBe(false);

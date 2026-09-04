@@ -18,7 +18,9 @@ A privacy-focused Chrome Extension (Manifest V3) that exports ChatGPT conversati
 ## 🛠 Project Status
 - **Phases 0–9 (Complete)**: Core model, ChatGPT DOM adapter, rich content extraction, virtualized scrolling, Phase 8 visual matching, Phase 9 resilience & diagnostics.
 - **Phase 10 (Complete)**: Browser Integration & End-to-End Validation — full messaging round-trip, settings-to-renderer pipeline, print surface cleanup, SPA route navigation protection, and local privacy guarantees.
-- **Phase 11 (Complete)**: Production Hardening & Release Readiness — manifest V3 audit, permissions minimization, duplicate export click protection, accessibility focus rules, error boundary hardening, reproducible release packaging script, and release checklist.
+- **Phase 11 (Complete)**: Production Hardening & Release Readiness — manifest V3 audit, permissions minimization, duplicate export click protection, accessibility focus rules, error boundary hardening, release packaging script, and release checklist.
+- **Phase 12 (Complete)**: Release-Candidate UX & Reliability Polish — filename sanitization, popup busy/aria-busy states, actionable error copy, state race condition hardening, and release-candidate verification.
+
 
 ## 📦 How to Build & Load in Chrome
 

@@ -29,10 +29,12 @@ import {
   InlineNode,
 } from '../conversation/Model';
 
+import { sanitizeFilename } from '../utils/filenameSanitizer';
 import { RenderOptions, DEFAULT_RENDER_OPTIONS } from './RenderTypes';
 import { generateDocumentStyles } from './rendererStyles';
 import { createDiagnosticEntry } from '../../utils/Diagnostics';
 import { logger } from '../../utils/logger';
+
 
 /**
  * Escapes HTML-special characters to prevent XSS / markup injection.
@@ -400,12 +402,14 @@ export function renderConversation(
       </footer>`
     : '';
 
+  const safeHeadTitle = sanitizeFilename(conversation.title);
+
   return `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(conversation.title)}</title>
+  <title>${escapeHtml(safeHeadTitle)}</title>
   <style>${stylesCss}</style>
 </head>
 <body>

@@ -107,7 +107,11 @@ export class PopupUI {
 
     this.isExporting = true;
     const exportBtn = this.getElement<HTMLButtonElement>('export-btn');
-    if (exportBtn) exportBtn.disabled = true;
+    if (exportBtn) {
+      exportBtn.disabled = true;
+      exportBtn.textContent = 'Exporting…';
+      exportBtn.setAttribute('aria-busy', 'true');
+    }
 
     this.hideStatus();
 
@@ -143,13 +147,18 @@ export class PopupUI {
         this.showStatus(errorMsg, 'error');
       }
     } catch {
-      this.showStatus('PDF export failed.', 'error');
+      this.showStatus('PDF export failed. Please try again.', 'error');
     } finally {
       this.isExporting = false;
-      if (exportBtn) exportBtn.disabled = false;
+      if (exportBtn) {
+        exportBtn.disabled = false;
+        exportBtn.textContent = 'Export as PDF';
+        exportBtn.removeAttribute('aria-busy');
+      }
     }
   }
 }
+
 
 
 if (typeof document !== 'undefined' && document.getElementById('export-btn')) {
