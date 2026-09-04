@@ -4,15 +4,14 @@
  * Handles virtualized ChatGPT DOM structures where not all conversation turns are
  * mounted in the DOM simultaneously.
  *
- * Algorithm:
- *   1. Capture user scroll position.
- *   2. Collect currently mounted turns using existing adapter & rich extraction.
- *   3. If short or non-virtualized (all turns mounted and top reached), exit fast-path.
- *   4. Scroll incrementally upwards/downwards, observing DOM mutations.
- *   5. Deduplicate discovered turns deterministically (data-message-id > data-testid > content hash).
- *   6. Reconstruct original chronological ordering.
- *   7. Restore user scroll position.
- *   8. Return normalized Conversation model with metadata completeness: 'complete'.
+ * Traversal Completeness Rules:
+ *   1. Traversal MUST verify reaching both top and bottom boundaries of the scroll container.
+ *   2. If maxDurationMs is reached at any point, throws ExtractionError('LONG_CONVERSATION_TIMEOUT').
+ *   3. If maxIterations or maxStagnantIterations limit is reached before full traversal,
+ *      throws ExtractionError('INCOMPLETE_CONVERSATION').
+ *   4. Metadata completeness = 'complete' is ONLY set when full traversal completes successfully.
+ *   5. Partial conversation models are NEVER returned as 'complete'.
+ *   6. User scroll position is ALWAYS restored in a finally block.
  */
 
 import {
@@ -52,7 +51,7 @@ interface DiscoveredTurn {
   id: string;
   role: MessageRole;
   blocks: ContentBlock[];
-  turnIndexHint: number; // Order index parsed from testid or discovery sequence
+  turnIndexHint: number;
 }
 
 /**
@@ -103,6 +102,7 @@ export class LongConversationExtractor {
 
   /**
    * Extracts the full conversation, scrolling incrementally if virtualized nodes exist.
+   * Guarantees complete traversal or throws a specific ExtractionError.
    */
   public async extractLongConversation(
     root: Document | Element = typeof document !== 'undefined' ? document : (null as unknown as Document),
@@ -139,10 +139,8 @@ export class LongConversationExtractor {
         const contentRoot = findContentRoot(turnEl);
         const blocks = contentRoot ? extractContentBlocks(contentRoot) : [];
 
-        // Primary identity
         let messageId = getDeterministicMessageId(turnEl, globalDiscoveryCounter);
 
-        // If messageId is a generic turn-N, upgrade to content fingerprint hash
         if (messageId.startsWith('turn-')) {
           const fingerprint = computeTurnFingerprint(role, blocks);
           messageId = `${role}-${fingerprint}`;
@@ -170,10 +168,12 @@ export class LongConversationExtractor {
       collectMountedTurns();
 
       // Step 2: Virtualization Detection
-      // If no scroll container exists or already at top with low turn count, assume non-virtualized
       const isVirtualized = scrollContainer
         ? scrollContainer.scrollHeight > scrollContainer.clientHeight + 100 || !this.scroller.isAtTop(scrollContainer)
         : false;
+
+      let hasReachedTop = !isVirtualized;
+      let hasReachedBottom = !isVirtualized;
 
       if (isVirtualized && scrollContainer) {
         logger.info('Virtualized conversation container detected. Starting incremental traversal...');
@@ -182,22 +182,21 @@ export class LongConversationExtractor {
         let iterations = 0;
         let stagnantCount = 0;
 
-        // Phase A: Scroll UP incrementally towards top to load historical turns
+        // ── Phase A: Scroll UP incrementally towards top to load historical turns ─────────
         while (!this.scroller.isAtTop(scrollContainer)) {
           if (Date.now() - startTime > this.options.maxDurationMs) {
             throw new ExtractionError(
-              'NO_TURNS_FOUND',
+              'LONG_CONVERSATION_TIMEOUT',
               'Long conversation extraction timed out during scroll-up traversal.'
             );
           }
           if (iterations >= this.options.maxIterations) {
             throw new ExtractionError(
-              'NO_TURNS_FOUND',
+              'INCOMPLETE_CONVERSATION',
               'Exceeded maximum scroll iterations during long conversation extraction.'
             );
           }
 
-          // Scroll up by 400px
           this.scroller.scrollByPx(scrollContainer, -400);
           await this.scroller.waitForDomMutation(scrollContainer, this.options.stepDelayMs);
 
@@ -207,25 +206,39 @@ export class LongConversationExtractor {
           if (added === 0) {
             stagnantCount++;
             if (stagnantCount >= this.options.maxStagnantIterations) {
-              // Forced scroll to top if stuck
+              // Forced scroll to top if stagnant
               this.scroller.scrollToTop(scrollContainer);
               await this.scroller.waitForDomMutation(scrollContainer, this.options.stepDelayMs);
               collectMountedTurns();
+
+              if (!this.scroller.isAtTop(scrollContainer)) {
+                throw new ExtractionError(
+                  'INCOMPLETE_CONVERSATION',
+                  'Could not reach top of conversation container after stagnant iterations.'
+                );
+              }
               break;
             }
           } else {
             stagnantCount = 0;
           }
         }
+        hasReachedTop = this.scroller.isAtTop(scrollContainer);
 
-        // Phase B: Scroll DOWN incrementally towards bottom to ensure all bottom turns are collected
+        // ── Phase B: Scroll DOWN incrementally towards bottom to ensure all bottom turns are collected
         stagnantCount = 0;
         while (!this.scroller.isAtBottom(scrollContainer)) {
           if (Date.now() - startTime > this.options.maxDurationMs) {
-            break; // Max duration reached, stop scrolling down and proceed with collected turns
+            throw new ExtractionError(
+              'LONG_CONVERSATION_TIMEOUT',
+              'Long conversation extraction timed out during scroll-down traversal.'
+            );
           }
           if (iterations >= this.options.maxIterations) {
-            break;
+            throw new ExtractionError(
+              'INCOMPLETE_CONVERSATION',
+              'Exceeded maximum scroll iterations during long conversation extraction.'
+            );
           }
 
           this.scroller.scrollByPx(scrollContainer, 400);
@@ -240,15 +253,31 @@ export class LongConversationExtractor {
               this.scroller.scrollToBottom(scrollContainer);
               await this.scroller.waitForDomMutation(scrollContainer, this.options.stepDelayMs);
               collectMountedTurns();
+
+              if (!this.scroller.isAtBottom(scrollContainer)) {
+                throw new ExtractionError(
+                  'INCOMPLETE_CONVERSATION',
+                  'Could not reach bottom of conversation container after stagnant iterations.'
+                );
+              }
               break;
             }
           } else {
             stagnantCount = 0;
           }
         }
+        hasReachedBottom = this.scroller.isAtBottom(scrollContainer);
       }
 
-      // Reconstruct chronological order based on turnIndexHint, then discovery index
+      // Step 3: Explicit Completeness Assertion
+      if (!hasReachedTop || !hasReachedBottom) {
+        throw new ExtractionError(
+          'INCOMPLETE_CONVERSATION',
+          'Traversal failed to verify both top and bottom conversation boundaries.'
+        );
+      }
+
+      // Reconstruct chronological order based on turnIndexHint
       const sortedTurns = Array.from(discoveredMap.values()).sort(
         (a, b) => a.turnIndexHint - b.turnIndexHint
       );
@@ -287,7 +316,7 @@ export class LongConversationExtractor {
         metadata,
       };
     } finally {
-      // Step 3: Always restore user scroll position
+      // Step 4: Always restore user scroll position
       this.scroller.restoreScrollPosition(initialPos);
     }
   }

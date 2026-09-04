@@ -26,7 +26,8 @@ LongConversationExtractor
   - Performs deterministic turn deduplication (data-message-id > data-testid > content hash)
   - Reconstructs original chronological sequence based on turn index hints
   - Enforces safety duration & iteration limits
-  - Restores original user scroll position
+  - Restores original user scroll position in finally block
+  - Sets metadata.completeness = 'complete' ONLY when full traversal completes successfully
     ↓
 Normalized Conversation Model (metadata.completeness = 'complete')
     ↓
@@ -48,21 +49,22 @@ DocumentRenderer → SettingsManager → PrintService
   2. `data-testid` attribute (e.g. `conversation-turn-1`)
   3. `role` + djb2 content fingerprint hash (Fallback)
 - **Chronological Order Reconstruction**: Sorts discovered turn records by numeric index hint parsed from `conversation-turn-N` or discovery sequence.
-- **Safety Limits & Timeouts**:
+- **Safety Limits & Completeness Assertion**:
   - `maxDurationMs`: 20,000ms
   - `maxIterations`: 60 scroll steps
   - `maxStagnantIterations`: 5 steps without discovering new turns
-  - Throws `INCOMPLETE_CONVERSATION` / `LONG_CONVERSATION_TIMEOUT` if limits are exceeded before full history is verified.
+  - **Explicit Completeness Rule**: If limits expire or boundaries (top/bottom) cannot be verified, `LongConversationExtractor` throws `LONG_CONVERSATION_TIMEOUT` or `INCOMPLETE_CONVERSATION`. It NEVER returns a partial conversation marked `completeness: 'complete'`.
 
 ---
 
-## Failure Modes & Error Codes
+## Error Handling & Code Mapping
 
-| Error Code | Trigger Condition | User Message |
+| Layer | Code | Trigger Condition |
 | :--- | :--- | :--- |
-| `STREAMING_IN_PROGRESS` | Assistant is actively generating | "ChatGPT is still generating a response. Wait until it finishes." |
-| `CONVERSATION_INCOMPLETE` | Virtualization traversal timed out or stagnant | "Could not collect the complete conversation. Please try again." |
-| `UNSUPPORTED_HOST` | Page domain is not `chatgpt.com` | "Open a ChatGPT conversation first." |
+| **Extractor Engine** | `LONG_CONVERSATION_TIMEOUT` | Max traversal duration (20,000ms) exceeded before reaching boundary |
+| **Extractor Engine** | `INCOMPLETE_CONVERSATION` | Max scroll iterations (60) or stagnant limit (5) reached before boundary |
+| **Export Service** | `CONVERSATION_INCOMPLETE` | Maps both `LONG_CONVERSATION_TIMEOUT` and `INCOMPLETE_CONVERSATION` |
+| **User UI Message** | `"Could not collect the complete conversation. Please try again."` | Human-readable popup status message |
 
 ---
 

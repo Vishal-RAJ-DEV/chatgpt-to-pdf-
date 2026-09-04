@@ -1,12 +1,13 @@
 /**
- * Integration Tests — Virtualized Conversation Extraction (Phase 7).
+ * Integration Tests — Virtualized Conversation Extraction (Phase 7 Hardening).
  *
  * Verifies end-to-end traversal, turn deduplication, order reconstruction,
- * and position restoration on simulated multi-pass virtualized DOM containers.
+ * scroll restoration, and safety limit enforcement on virtualized DOM containers.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConversationScroller } from '../../src/adapters/chatgpt/ConversationScroller';
+import { ExtractionError } from '../../src/core/conversation/Extractor';
 import { LongConversationExtractor } from '../../src/core/conversation/LongConversationExtractor';
 
 describe('Virtualized Conversation Extraction Integration Tests', () => {
@@ -88,6 +89,7 @@ describe('Virtualized Conversation Extraction Integration Tests', () => {
     const conversation = await extractor.extractLongConversation(document, '/c/virtualized-chat');
 
     expect(conversation.messages.length).toBe(10);
+    expect(conversation.metadata?.completeness).toBe('complete');
     expect(conversation.messages.map((m) => m.id)).toEqual([
       'msg-id-1',
       'msg-id-2',
@@ -100,5 +102,31 @@ describe('Virtualized Conversation Extraction Integration Tests', () => {
       'msg-id-9',
       'msg-id-10',
     ]);
+  });
+
+  it('3. rejects partial collection when iteration limit is reached before reaching boundaries', async () => {
+    const container = document.createElement('div');
+    container.setAttribute('data-testid', 'conversation-turns-container');
+    document.body.appendChild(container);
+
+    const turn1 = document.createElement('div');
+    turn1.setAttribute('data-testid', 'conversation-turn-1');
+    turn1.setAttribute('data-message-id', 'msg-1');
+    turn1.setAttribute('data-message-author-role', 'user');
+    turn1.innerHTML = '<div class="user-message-content">Initial Prompt</div>';
+    container.appendChild(turn1);
+
+    const mockScroller = new ConversationScroller();
+    vi.spyOn(mockScroller, 'isAtTop').mockReturnValue(false); // Top never reached
+
+    const extractor = new LongConversationExtractor(mockScroller, {
+      maxIterations: 2,
+      stepDelayMs: 0,
+    });
+
+    const res = await extractor.extractLongConversation(document).catch((e) => e);
+
+    expect(res).toBeInstanceOf(ExtractionError);
+    expect((res as ExtractionError).code).toBe('INCOMPLETE_CONVERSATION');
   });
 });
