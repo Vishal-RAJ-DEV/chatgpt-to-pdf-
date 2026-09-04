@@ -58,20 +58,39 @@ export function findTurnCandidates(root: Document | Element = typeof document !=
 
 /**
  * Determine the role ('user', 'assistant', 'system') of a turn element.
+ *
+ * In the real ChatGPT DOM the turn container is an `article[data-testid="conversation-turn-N"]`
+ * and `data-message-author-role` can be on:
+ *   - the article itself (older DOM / fixture shape), OR
+ *   - a direct child `div[data-message-author-role]` inside the article (current real DOM shape).
+ *
+ * We check the element itself first, then its first descendant bearing the attribute,
+ * before falling back to testid/className heuristics.
  */
 export function getRoleFromElement(element: Element): 'user' | 'assistant' | 'system' | null {
   if (!element) return null;
+
+  // 1. Check the turn element's own attribute (fixture / older DOM shape)
   const roleAttr = element.getAttribute('data-message-author-role');
   if (roleAttr === 'user' || roleAttr === 'assistant' || roleAttr === 'system') {
     return roleAttr;
   }
 
-  // Fallback checking data-testid attribute string
+  // 2. Check the first descendant with data-message-author-role (real ChatGPT DOM shape)
+  const childWithRole = element.querySelector('[data-message-author-role]');
+  if (childWithRole) {
+    const childRole = childWithRole.getAttribute('data-message-author-role');
+    if (childRole === 'user' || childRole === 'assistant' || childRole === 'system') {
+      return childRole;
+    }
+  }
+
+  // 3. Fallback checking data-testid attribute string
   const testId = element.getAttribute('data-testid') || '';
   if (testId.includes('user')) return 'user';
   if (testId.includes('assistant')) return 'assistant';
 
-  // Secondary fallback checking class names
+  // 4. Secondary fallback checking class names
   const className = typeof element.className === 'string' ? element.className : '';
   if (className.includes('user')) return 'user';
   if (className.includes('assistant') || className.includes('agent-turn')) return 'assistant';

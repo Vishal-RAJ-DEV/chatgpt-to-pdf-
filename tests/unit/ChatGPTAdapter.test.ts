@@ -12,6 +12,7 @@ import {
   getConversationId,
   isStreaming,
 } from '../../src/adapters/chatgpt/ChatGPTAdapter';
+import { extractConversationWithResult } from '../../src/core/conversation/Extractor';
 
 function loadFixture(filename: string): Document {
   const filePath = resolve(__dirname, '../fixtures/html', filename);
@@ -153,5 +154,88 @@ describe('ChatGPTAdapter Phase 9 Resilience & Fallback Tests', () => {
 
     const contentRoot = findContentRoot(turnEl);
     expect(contentRoot).toBeNull();
+  });
+});
+
+describe('Phase 13 Correction #2 — Real ChatGPT DOM Shape (role on child div)', () => {
+  /**
+   * Regression suite for the real ChatGPT DOM structure where:
+   *   - Outer element: article[data-testid="conversation-turn-N"]   (NO role attribute)
+   *   - Inner element: div[data-message-author-role="user|assistant"] (role lives HERE)
+   *
+   * Previously getRoleFromElement only checked the passed element's own attributes,
+   * causing all turns to be classified as 'unknown' in the real browser.
+   */
+
+  it('1. getRoleFromElement resolves "user" when role attr is on a child element', () => {
+    const doc = document.implementation.createHTMLDocument('test');
+    const article = doc.createElement('article');
+    article.setAttribute('data-testid', 'conversation-turn-1');
+    const inner = doc.createElement('div');
+    inner.setAttribute('data-message-author-role', 'user');
+    inner.innerHTML = '<div class="whitespace-pre-wrap">Hello</div>';
+    article.appendChild(inner);
+
+    expect(getRoleFromElement(article)).toBe('user');
+  });
+
+  it('2. getRoleFromElement resolves "assistant" when role attr is on a child element', () => {
+    const doc = document.implementation.createHTMLDocument('test');
+    const article = doc.createElement('article');
+    article.setAttribute('data-testid', 'conversation-turn-2');
+    const inner = doc.createElement('div');
+    inner.setAttribute('data-message-author-role', 'assistant');
+    inner.innerHTML = '<div class="markdown prose"><p>Answer</p></div>';
+    article.appendChild(inner);
+
+    expect(getRoleFromElement(article)).toBe('assistant');
+  });
+
+  it('3. getRoleFromElement still works when role attr is on the element itself (fixture/older DOM)', () => {
+    const doc = document.implementation.createHTMLDocument('test');
+    const article = doc.createElement('article');
+    article.setAttribute('data-testid', 'conversation-turn-1');
+    article.setAttribute('data-message-author-role', 'user');
+    article.innerHTML = '<div class="user-message-content">Hello</div>';
+
+    expect(getRoleFromElement(article)).toBe('user');
+  });
+
+  it('4. getRoleFromElement returns null for auxiliary element with no role anywhere', () => {
+    const doc = document.implementation.createHTMLDocument('test');
+    const article = doc.createElement('article');
+    article.setAttribute('data-testid', 'conversation-turn-3');
+    article.innerHTML = '<div class="system-message-banner"><span>ChatGPT can make mistakes.</span></div>';
+
+    expect(getRoleFromElement(article)).toBeNull();
+  });
+
+  it('5. full extraction of real-DOM-shape fixture returns status success with correct roles', () => {
+    const doc = loadFixture('chatgpt-real-dom-shape.html');
+    const turns = findTurnCandidates(doc);
+
+    // Should find all 3 turn articles
+    expect(turns.length).toBe(3);
+
+    // Turn 1: role on child div -> must resolve to user
+    expect(getRoleFromElement(turns[0])).toBe('user');
+
+    // Turn 2: role on child div -> must resolve to assistant
+    expect(getRoleFromElement(turns[1])).toBe('assistant');
+
+    // Turn 3: auxiliary with no role anywhere -> null (unknown)
+    expect(getRoleFromElement(turns[2])).toBeNull();
+  });
+
+  it('6. extractConversationWithResult on real-DOM-shape fixture returns status success without partial warning', () => {
+    const doc = loadFixture('chatgpt-real-dom-shape.html');
+    const result = extractConversationWithResult(doc, '/c/test-real-dom');
+
+    expect(result.status).toBe('success');
+    expect(result.conversation).not.toBeNull();
+    expect(result.counts.user).toBe(1);
+    expect(result.counts.assistant).toBe(1);
+    // Auxiliary unknown turn (turn 3) must not trigger a partial warning
+    expect(result.warnings.some((w) => w.code === 'EXTRACTION_PARTIAL')).toBe(false);
   });
 });

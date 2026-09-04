@@ -1,0 +1,67 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Real DOM Shape Conversation - ChatGPT</title>
+</head>
+<body>
+  <div id="__next">
+    <main class="relative h-full w-full flex-1 overflow-hidden transition-width">
+      <div class="flex h-full flex-col" data-testid="conversation-turns-container">
+
+        <!-- Turn 1: User — role on child div, NOT on article -->
+        <article data-testid="conversation-turn-1" class="w-full text-token-text-primary">
+          <h5 class="sr-only">You said:</h5>
+          <div class="m-auto text-base py-[18px] px-3 w-full">
+            <div class="mx-auto flex flex-1 gap-4 text-base md:max-w-3xl">
+              <div class="group/conversation-turn relative flex w-full min-w-0 flex-col agent-turn">
+                <div class="flex-col gap-1">
+                  <div class="flex max-w-full flex-col flex-grow">
+                    <div data-message-id="msg-abc-user-1" data-message-author-role="user" dir="auto" class="min-h-8 text-message flex w-full flex-col items-end gap-2 whitespace-normal break-words">
+                      <div class="flex w-full flex-col gap-1 empty:hidden items-end">
+                        <div class="relative max-w-[70%] rounded-3xl bg-token-message-surface px-5 py-2.5">
+                          <div class="whitespace-pre-wrap">Hello, can you explain Python decorators?</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Turn 2: Assistant — role on child div, NOT on article -->
+        <article data-testid="conversation-turn-2" class="w-full text-token-text-primary">
+          <h5 class="sr-only">ChatGPT said:</h5>
+          <div class="m-auto text-base py-[18px] px-3 w-full">
+            <div class="mx-auto flex flex-1 gap-4 text-base md:max-w-3xl">
+              <div class="group/conversation-turn relative flex w-full min-w-0 flex-col agent-turn">
+                <div class="flex-col gap-1">
+                  <div class="flex max-w-full flex-col flex-grow">
+                    <div data-message-id="msg-abc-asst-2" data-message-author-role="assistant" dir="auto" class="min-h-8 text-message flex w-full flex-col items-end gap-2 whitespace-normal break-words">
+                      <div class="flex w-full flex-col gap-1 empty:hidden first:pt-[3px]">
+                        <div class="markdown prose w-full break-words dark:prose-invert light">
+                          <p>Python decorators are a design pattern that allows you to modify the behavior of a function.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Auxiliary: turn testid but no role anywhere (system disclaimer widget) -->
+        <article data-testid="conversation-turn-3" class="w-full">
+          <div class="system-message-banner">
+            <span>ChatGPT can make mistakes. Consider checking important information.</span>
+          </div>
+        </article>
+
+      </div>
+    </main>
+  </div>
+</body>
+</html>
