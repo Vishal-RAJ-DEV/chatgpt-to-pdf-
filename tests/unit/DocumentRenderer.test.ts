@@ -639,4 +639,12 @@ describe('Phase 8C Pagination & Page-Break Engineering (All 17 Scenarios)', () =
     const html = renderConversation(testConv);
     expect(html).toContain('.message-body {\n      display: block;\n    }');
   });
+
+  it('P20. token-driven element spacing is preserved without broad wildcard overrides', () => {
+    const html = renderConversation(testConv);
+    expect(html).not.toContain('.message-body > * {');
+    expect(html).toContain('p {\n      margin-bottom: 8px;');
+    expect(html).toContain('.code-wrapper {\n      margin: 10px 0;');
+    expect(html).toContain('.table-wrapper {\n      margin: 10px 0;');
+  });
 });

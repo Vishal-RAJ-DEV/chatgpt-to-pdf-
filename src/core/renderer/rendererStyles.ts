@@ -143,16 +143,13 @@ export function generateDocumentStyles(options: RenderOptions): string {
       display: block;
     }
 
-    .message-body > * {
-      margin-bottom: 8px;
-    }
-
     .message-body > *:last-child {
       margin-bottom: 0;
     }
 
     /* ── Paragraphs & Typography ────────────────────────────────────────── */
     p {
+      margin-bottom: ${tokens.spacing.paragraphMarginBottom};
       color: ${tokens.colors.textPrimary};
     }
 
@@ -184,6 +181,7 @@ export function generateDocumentStyles(options: RenderOptions): string {
     /* ── Lists ───────────────────────────────────────────────────────────── */
     ul, ol {
       padding-left: ${tokens.spacing.listPaddingLeft};
+      margin-bottom: ${tokens.spacing.paragraphMarginBottom};
     }
 
     li {
