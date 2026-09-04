@@ -31,6 +31,8 @@ import {
 
 import { RenderOptions, DEFAULT_RENDER_OPTIONS } from './RenderTypes';
 import { generateDocumentStyles } from './rendererStyles';
+import { createDiagnosticEntry } from '../../utils/Diagnostics';
+import { logger } from '../../utils/logger';
 
 /**
  * Escapes HTML-special characters to prevent XSS / markup injection.
@@ -301,6 +303,13 @@ function renderBlock(block: ContentBlock): string {
       default: {
         // Safe fallback for unknown block types
         const unknownBlock = block as Record<string, unknown>;
+        const entry = createDiagnosticEntry(
+          'warning',
+          'RENDER_UNKNOWN_BLOCK',
+          'Unknown block type encountered during rendering.',
+          { blockType: String(unknownBlock?.type || 'unknown') }
+        );
+        logger.diagnostic(entry);
         return `<p class="fallback-block">${escapeHtml(JSON.stringify(unknownBlock))}</p>`;
       }
     }

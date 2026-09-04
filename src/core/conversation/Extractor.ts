@@ -309,3 +309,51 @@ export async function extractConversationAsync(
   const extractor = new LongConversationExtractor();
   return extractor.extractLongConversation(root, urlPath);
 }
+
+/**
+ * Asynchronous long-conversation extractor returning full ExtractionResult model.
+ */
+export async function extractConversationWithResultAsync(
+  root: Document | Element = typeof document !== 'undefined' ? document : (null as unknown as Document),
+  urlPath: string = typeof window !== 'undefined' ? window.location.pathname : ''
+): Promise<ExtractionResult> {
+  const syncResult = extractConversationWithResult(root, urlPath);
+  if (syncResult.status === 'success' || syncResult.status === 'suspicious_empty' || syncResult.status === 'empty') {
+    return syncResult;
+  }
+  try {
+    const { LongConversationExtractor } = await import('./LongConversationExtractor');
+    const extractor = new LongConversationExtractor();
+    const conversation = await extractor.extractLongConversation(root, urlPath);
+    return {
+      status: 'success',
+      conversation,
+      warnings: syncResult.warnings,
+      errors: [],
+      counts: {
+        turns: conversation.messages.length,
+        user: conversation.messages.filter((m) => m.role === 'user').length,
+        assistant: conversation.messages.filter((m) => m.role === 'assistant').length,
+        unknown: conversation.messages.filter((m) => m.role !== 'user' && m.role !== 'assistant').length,
+        blocks: conversation.messages.reduce((acc, m) => acc + m.blocks.length, 0),
+      },
+    };
+  } catch (err) {
+    if (err instanceof ExtractionError) {
+      return {
+        status: 'failure',
+        conversation: null,
+        warnings: syncResult.warnings,
+        errors: [
+          createDiagnosticEntry(
+            'error',
+            err.code as DiagnosticCode,
+            err.message
+          ),
+        ],
+        counts: { turns: 0, user: 0, assistant: 0, unknown: 0, blocks: 0 },
+      };
+    }
+    return syncResult;
+  }
+}

@@ -7,7 +7,7 @@
  */
 
 import { checkHealth } from '../adapters/chatgpt/healthCheck';
-import { extractConversationAsync, ExtractionError } from '../core/conversation/Extractor';
+import { extractConversationWithResultAsync, ExtractionError } from '../core/conversation/Extractor';
 import { logger } from '../utils/logger';
 
 logger.info('ChatGPT Exporter content script loaded.');
@@ -31,8 +31,15 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
     if (action === 'EXTRACT_CONVERSATION') {
       (async () => {
         try {
-          const conversation = await extractConversationAsync();
-          sendResponse({ success: true, conversation });
+          const result = await extractConversationWithResultAsync();
+          sendResponse({
+            success: result.status === 'success' || result.status === 'partial' || result.status === 'empty',
+            result,
+            conversation: result.conversation,
+            status: result.status,
+            warnings: result.warnings,
+            errors: result.errors,
+          });
         } catch (err) {
           if (err instanceof ExtractionError) {
             sendResponse({

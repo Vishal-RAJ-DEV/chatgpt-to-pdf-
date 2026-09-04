@@ -127,3 +127,31 @@ describe('ChatGPTAdapter Streaming Detection', () => {
     expect(isStreaming(doc)).toBe(true);
   });
 });
+
+describe('ChatGPTAdapter Phase 9 Resilience & Fallback Tests', () => {
+  it('rejects generic article.w-full elements without author role or turn testid', () => {
+    const doc = document.implementation.createHTMLDocument('test');
+    const container = doc.createElement('div');
+    container.setAttribute('data-testid', 'conversation-turns-container');
+    doc.body.appendChild(container);
+
+    const genericArticle = doc.createElement('article');
+    genericArticle.className = 'w-full text-token-text-primary';
+    container.appendChild(genericArticle);
+
+    const turns = findTurnCandidates(doc);
+    expect(turns.length).toBe(0);
+  });
+
+  it('returns null from findContentRoot when content root cannot be identified', () => {
+    const doc = document.implementation.createHTMLDocument('test');
+    const turnEl = doc.createElement('div');
+    turnEl.setAttribute('data-message-author-role', 'assistant');
+    const buttonOnly = doc.createElement('button');
+    buttonOnly.textContent = 'Copy';
+    turnEl.appendChild(buttonOnly);
+
+    const contentRoot = findContentRoot(turnEl);
+    expect(contentRoot).toBeNull();
+  });
+});

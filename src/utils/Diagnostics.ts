@@ -11,6 +11,12 @@
 export type DiagnosticLevel = 'info' | 'warning' | 'error';
 
 export type DiagnosticCode =
+  | 'UNSUPPORTED_HOST'
+  | 'STREAMING_IN_PROGRESS'
+  | 'CONVERSATION_NOT_FOUND'
+  | 'NO_TURNS_FOUND'
+  | 'INCOMPLETE_CONVERSATION'
+  | 'LONG_CONVERSATION_TIMEOUT'
   | 'ADAPTER_CONTAINER_NOT_FOUND'
   | 'ADAPTER_MESSAGE_NOT_FOUND'
   | 'EXTRACTION_EMPTY_SUSPICIOUS'
@@ -31,24 +37,48 @@ export interface DiagnosticEntry {
   readonly context?: Record<string, unknown>;
 }
 
+const ALLOWED_CONTEXT_KEYS = new Set([
+  'turnIndex',
+  'turnCount',
+  'userCount',
+  'assistantCount',
+  'unknownRoleCount',
+  'blockCount',
+  'stage',
+  'selector',
+  'confidence',
+  'code',
+  'hasConversationRoot',
+  'hasContentRoot',
+  'hasRoot',
+  'selectors',
+  'host',
+  'error',
+  'completeness',
+  'viewportPasses',
+  'isVirtualized',
+  'stagnantCount',
+  'role',
+  'blockType',
+]);
+
 /**
  * Sanitizes context objects to guarantee zero leakage of conversation text or sensitive strings.
+ * Uses a strict ALLOW-LIST of safe structural metadata keys.
  */
 export function sanitizeDiagnosticContext(context?: Record<string, unknown>): Record<string, unknown> | undefined {
   if (!context) return undefined;
   const sanitized: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(context)) {
-    // Exclude keys that could potentially contain prompt or message text
-    if (['text', 'prompt', 'response', 'body', 'content', 'html', 'raw'].includes(key.toLowerCase())) {
+    // Strictly enforce allow-list of safe metadata keys
+    if (!ALLOWED_CONTEXT_KEYS.has(key)) {
       continue;
     }
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null) {
       sanitized[key] = value;
     } else if (Array.isArray(value)) {
       sanitized[key] = value.length; // convert arrays to count
-    } else if (typeof value === 'object') {
-      sanitized[key] = '[Object]';
     }
   }
 

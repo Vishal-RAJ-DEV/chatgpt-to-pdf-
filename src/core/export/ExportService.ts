@@ -13,6 +13,7 @@
  */
 
 import { isSupportedHost } from '../../adapters/chatgpt/ChatGPTAdapter';
+import { ExtractionResult, ExtractionStatus } from '../conversation/ExtractionResult';
 import { Conversation } from '../conversation/Model';
 import { renderConversation } from '../renderer/DocumentRenderer';
 import { SettingsManager } from '../settings/SettingsManager';
@@ -20,6 +21,7 @@ import { toRenderOptions } from '../settings/toRenderOptions';
 import { ExportError, ExportErrorCode } from './ExportErrors';
 import { ExportResult, ExportState } from './ExportResult';
 import { PrintService } from './PrintService';
+import { DiagnosticEntry } from '../../utils/Diagnostics';
 
 export interface TabCommunicator {
   getActiveTab(): Promise<{ id?: number; url?: string }>;
@@ -208,7 +210,11 @@ export class ExportService {
       // ── Stage 2: Conversation Extraction via Content Script ────────────────
       interface ContentScriptResponse {
         success: boolean;
+        result?: ExtractionResult;
         conversation?: Conversation;
+        status?: ExtractionStatus;
+        warnings?: readonly DiagnosticEntry[];
+        errors?: readonly DiagnosticEntry[];
         error?: string;
         code?: string;
       }
@@ -224,21 +230,51 @@ export class ExportService {
         throw new ExportError(ExportErrorCode.EXTRACTION_FAILED, String(err));
       }
 
-      if (!response || !response.success || !response.conversation) {
-        if (response?.code === ExportErrorCode.STREAMING_IN_PROGRESS) {
-          throw new ExportError(ExportErrorCode.STREAMING_IN_PROGRESS);
-        }
-        if (response?.code === ExportErrorCode.CONVERSATION_NOT_FOUND ||
-            response?.code === 'CONVERSATION_NOT_FOUND') {
-          throw new ExportError(ExportErrorCode.CONVERSATION_NOT_FOUND);
-        }
-        if (response?.code === 'INCOMPLETE_CONVERSATION' || response?.code === 'LONG_CONVERSATION_TIMEOUT') {
-          throw new ExportError(ExportErrorCode.CONVERSATION_INCOMPLETE);
-        }
+      const status = response?.result?.status || response?.status;
+
+      if (
+        status === 'suspicious_empty' ||
+        response?.code === ExportErrorCode.EXTRACTION_EMPTY_SUSPICIOUS ||
+        response?.code === 'EXTRACTION_EMPTY_SUSPICIOUS'
+      ) {
+        throw new ExportError(ExportErrorCode.EXTRACTION_EMPTY_SUSPICIOUS);
+      }
+
+      if (response?.code === ExportErrorCode.STREAMING_IN_PROGRESS || response?.code === 'STREAMING_IN_PROGRESS') {
+        throw new ExportError(ExportErrorCode.STREAMING_IN_PROGRESS);
+      }
+      if (response?.code === ExportErrorCode.CONVERSATION_NOT_FOUND || response?.code === 'CONVERSATION_NOT_FOUND') {
+        throw new ExportError(ExportErrorCode.CONVERSATION_NOT_FOUND);
+      }
+      if (response?.code === 'INCOMPLETE_CONVERSATION' || response?.code === 'LONG_CONVERSATION_TIMEOUT') {
+        throw new ExportError(ExportErrorCode.CONVERSATION_INCOMPLETE);
+      }
+
+      if (!response || (!response.success && status !== 'empty')) {
         throw new ExportError(ExportErrorCode.EXTRACTION_FAILED, response?.error);
       }
 
-      const conversation = response.conversation;
+      let conversation = response.result?.conversation || response.conversation;
+
+      if (!conversation) {
+        if (status === 'empty') {
+          conversation = {
+            id: null,
+            title: 'ChatGPT Conversation',
+            url: activeTab.url || 'https://chatgpt.com',
+            createdAt: new Date().toISOString(),
+            messages: [],
+            metadata: {
+              source: 'chatgpt.com',
+              extractedAt: new Date().toISOString(),
+              adapterVersion: '0.1.0',
+              confidence: 'high',
+            },
+          };
+        } else {
+          throw new ExportError(ExportErrorCode.EXTRACTION_FAILED, response?.error);
+        }
+      }
 
       // ── Stage 3: Settings Loading & Rendering ──────────────────────────────
       notifyState('rendering');

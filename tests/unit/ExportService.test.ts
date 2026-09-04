@@ -217,4 +217,40 @@ describe('ExportService Orchestrator Unit Tests', () => {
     const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
     expect(await service.checkConversationReady()).toBe('unsupported');
   });
+
+  it('15. blocks export when extraction status is suspicious_empty -> EXTRACTION_EMPTY_SUSPICIOUS', async () => {
+    mockCommunicator.sendMessage = vi.fn().mockResolvedValue({
+      success: false,
+      result: {
+        status: 'suspicious_empty',
+        conversation: null,
+        warnings: [{ level: 'warning', code: 'EXTRACTION_EMPTY_SUSPICIOUS', message: 'Empty turns', timestamp: '2026-01-01' }],
+        errors: [],
+        counts: { turns: 0, user: 0, assistant: 0, unknown: 0, blocks: 0 },
+      },
+    });
+    const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
+    const result = await service.exportCurrentTab();
+
+    expect(result.success).toBe(false);
+    expect(result.errorCode).toBe(ExportErrorCode.EXTRACTION_EMPTY_SUSPICIOUS);
+  });
+
+  it('16. allows safe export when extraction status is partial with warnings', async () => {
+    mockCommunicator.sendMessage = vi.fn().mockResolvedValue({
+      success: true,
+      result: {
+        status: 'partial',
+        conversation: sampleConversation,
+        warnings: [{ level: 'warning', code: 'ADAPTER_MESSAGE_NOT_FOUND', message: 'Missing root', timestamp: '2026-01-01' }],
+        errors: [],
+        counts: { turns: 2, user: 1, assistant: 1, unknown: 0, blocks: 2 },
+      },
+    });
+    const service = new ExportService(mockCommunicator, mockSettingsManager, mockPrintService);
+    const result = await service.exportCurrentTab();
+
+    expect(result.success).toBe(true);
+    expect(mockPrintService.print).toHaveBeenCalled();
+  });
 });

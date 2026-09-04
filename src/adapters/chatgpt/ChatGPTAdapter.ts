@@ -49,7 +49,7 @@ export function findTurnCandidates(root: Document | Element = typeof document !=
     }
   }
   // Secondary fallback: find elements with data-message-author-role or turn-like testids
-  const fallbackNodes = container.querySelectorAll('[data-message-author-role], [data-testid*="conversation-turn-"], article.w-full');
+  const fallbackNodes = container.querySelectorAll('[data-message-author-role], [data-testid*="conversation-turn-"]');
   if (fallbackNodes.length > 0) {
     return Array.from(fallbackNodes);
   }
@@ -102,7 +102,7 @@ export function findContentRoot(turnElement: Element): Element | null {
   const genericEl = turnElement.querySelector('.markdown.prose, .user-message-content, .prose, .whitespace-pre-wrap');
   if (genericEl) return genericEl;
 
-  return turnElement;
+  return null;
 }
 
 /**
