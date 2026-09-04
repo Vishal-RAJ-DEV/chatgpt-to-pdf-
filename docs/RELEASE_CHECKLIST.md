@@ -6,9 +6,10 @@ This checklist outlines the mandatory steps required before publishing or releas
 
 ## 1. Manifest & Permissions Audit
 - [ ] **Manifest V3 Compliance**: Confirm `manifest_version: 3` and `"minimum_chrome_version": "110"` are set in `manifest.json`.
-- [ ] **Permissions Minimization**: Confirm `permissions` contains ONLY `["storage", "activeTab"]`.
+- [ ] **Permissions Allow-list**: Confirm declared `permissions` are restricted to the verified allow-list `["storage", "activeTab"]`.
 - [ ] **Host Scope**: Confirm `content_scripts.matches` contains ONLY `["https://chatgpt.com/*"]`.
 - [ ] **No High-Risk Permissions**: Verify broad host permissions (`<all_urls>`, `*://*/*`), `tabs`, `scripting`, `webRequest`, `cookies`, or `debugger` are **NOT** present.
+
 
 ---
 
