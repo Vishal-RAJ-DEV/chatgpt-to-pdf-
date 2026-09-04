@@ -8,12 +8,18 @@
 </head>
 <body>
   <div class="popup-container">
-    <h1 class="popup-title">ChatGPT PDF Exporter</h1>
-    <div class="status">
-      <span class="status-icon">✓</span>
-      <span class="status-text">Extension installed</span>
-    </div>
-    <button id="open-settings" class="btn">Open Settings</button>
+    <header class="popup-header">
+      <h1 class="popup-title">ChatGPT PDF Exporter</h1>
+      <div id="page-status" class="page-status">
+        <span id="status-badge" class="badge badge-info">Checking page...</span>
+      </div>
+    </header>
+
+    <main class="popup-main">
+      <button id="export-btn" class="btn btn-primary" disabled>Export as PDF</button>
+      <button id="open-settings" class="btn btn-secondary">Settings</button>
+      <div id="status-box" class="status-box" aria-live="polite"></div>
+    </main>
   </div>
   <script type="module" src="./popup.ts"></script>
 </body>

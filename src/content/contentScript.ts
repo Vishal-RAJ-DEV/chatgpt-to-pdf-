@@ -1,24 +1,55 @@
 /**
- * Content Script — Phase 2 entry point.
+ * Content Script — Phase 6 Entry Point.
  *
- * Injected on https://chatgpt.com/* by the Chrome extension manifest.
- * Performs diagnostic logging and DOM health check reporting.
+ * Injected on https://chatgpt.com/* by Chrome Manifest V3.
+ * Listens for extension runtime messages, checks DOM health, and executes
+ * conversation extraction within page context.
  */
 
-import { logger } from '../utils/logger';
 import { checkHealth } from '../adapters/chatgpt/healthCheck';
+import { extractConversation, ExtractionError } from '../core/conversation/Extractor';
+import { logger } from '../utils/logger';
 
-function main(): void {
-  logger.info('Content script loaded');
+logger.info('ChatGPT Exporter content script loaded.');
 
-  const health = checkHealth();
-  logger.info('Host supported:', health.supportedHost);
-  logger.info('Document ready:', health.documentReady);
-  logger.info('Conversation detected:', health.conversationDetected);
-  logger.info('Turns found:', health.turnCandidatesFound);
-  logger.info('User turns found:', health.userTurnsFound);
-  logger.info('Assistant turns found:', health.assistantTurnsFound);
-  logger.info('DOM Health confidence:', health.confidence);
+if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (!message || typeof message !== 'object') return false;
+
+    const action = (message as { action?: string }).action;
+
+    if (action === 'CHECK_HEALTH') {
+      try {
+        const health = checkHealth();
+        sendResponse({ success: true, health });
+      } catch (err) {
+        sendResponse({ success: false, error: String(err) });
+      }
+      return true;
+    }
+
+    if (action === 'EXTRACT_CONVERSATION') {
+      try {
+        const conversation = extractConversation();
+        sendResponse({ success: true, conversation });
+      } catch (err) {
+        if (err instanceof ExtractionError) {
+          sendResponse({
+            success: false,
+            error: err.message,
+            code: err.code,
+          });
+        } else {
+          sendResponse({
+            success: false,
+            error: err instanceof Error ? err.message : String(err),
+            code: 'EXTRACTION_FAILED',
+          });
+        }
+      }
+      return true;
+    }
+
+    return false;
+  });
 }
-
-main();
