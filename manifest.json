@@ -7,10 +7,16 @@
     "storage",
     "activeTab"
   ],
-  "host_permissions": [
-    "https://chatgpt.com/*"
-  ],
   "action": {
-    "default_title": "Export ChatGPT to PDF"
-  }
+    "default_title": "Export ChatGPT to PDF",
+    "default_popup": "src/ui/popup/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "src/ui/options/options.html"
 }

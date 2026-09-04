@@ -14,5 +14,45 @@ A privacy-focused Chrome Extension (Manifest V3) that exports ChatGPT conversati
 - [Testing Strategy](docs/TESTING.md)
 
 ## 🛠 Project Status
-- **Phase 0 (Complete)**: Architecture design, data models, PDF strategy evaluation, testing framework setup, and project discovery.
-- **Phase 1 (Pending)**: Core Extractor, ChatGPT Adapter (Primary selectors), Document Renderer & Local Browser Print Exporter implementation.
+- **Phase 0 (Complete)**: Architecture design, data models, PDF strategy evaluation, testing framework setup.
+- **Phase 1 (Complete)**: Extension Foundation — Manifest V3, Vite build setup, popup UI, options placeholder, diagnostic content script, and health checks.
+
+## 📦 How to Load in Chrome (Phase 1)
+
+Follow these steps to build and load the extension into Chrome:
+
+1. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Build the Extension**:
+   ```bash
+   npm run build
+   ```
+   *(This compiles TypeScript, bundles the popup, options page, and content script, and outputs to the `dist/` directory.)*
+
+3. **Open Chrome Extensions Page**:
+   Open Chrome and navigate to `chrome://extensions`.
+
+4. **Enable Developer Mode**:
+   Toggle the **Developer mode** switch in the top-right corner of the page.
+
+5. **Load Unpacked Extension**:
+   Click the **Load unpacked** button in the top-left corner and select the `dist/` folder inside this project directory.
+
+6. **Verify Installation**:
+   - Click the extension icon in Chrome to view the popup status ("Extension installed ✓").
+   - Click **Open Settings** to open the options page.
+   - Open [https://chatgpt.com](https://chatgpt.com), open the Developer Tools Console (`F12`), and confirm the diagnostic log:
+     ```text
+     [ChatGPT PDF Exporter] Content script loaded
+     [ChatGPT PDF Exporter] Host supported: true
+     [ChatGPT PDF Exporter] Document ready: true
+     ```
+
+## 🧪 Running Tests & Typechecking
+
+- **Typecheck**: `npm run typecheck`
+- **Unit Tests**: `npm test`
+- **Build**: `npm run build`
