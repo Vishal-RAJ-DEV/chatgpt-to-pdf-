@@ -32,7 +32,7 @@ describe('Settings Regression Matrix — 16 Configuration Tests', () => {
     { name: 'A. default settings', override: {} },
     { name: 'B. page size changed', override: { pageSize: 'LETTER' } },
     { name: 'C. orientation changed', override: { orientation: 'landscape' } },
-    { name: 'D. margins changed', override: { marginTop: '20mm', marginBottom: '20mm' } },
+    { name: 'D. margins changed', override: { marginTop: '20mm', marginBottom: '20mm', marginLeft: '25mm', marginRight: '25mm' } },
     { name: 'E. font family changed', override: { fontFamily: 'Georgia, serif' } },
     { name: 'F. font size changed', override: { baseFontSize: '16px' } },
     { name: 'G. line height changed', override: { lineHeight: 1.8 } },
@@ -48,7 +48,7 @@ describe('Settings Regression Matrix — 16 Configuration Tests', () => {
   ];
 
   matrix.forEach(({ name, override }) => {
-    it(`verifies printable HTML generation for: ${name}`, () => {
+    it(`verifies printable HTML and CSS generation for: ${name}`, () => {
       const mergedSettings: UserSettings = { ...DEFAULT_SETTINGS, ...override };
       const renderOpts = toRenderOptions(mergedSettings);
       const html = renderConversation(mockConversation, renderOpts);
@@ -58,7 +58,9 @@ describe('Settings Regression Matrix — 16 Configuration Tests', () => {
       expect(html).toContain('<html lang="en">');
       expect(html).toContain('</html>');
       expect(html.length).toBeGreaterThan(500);
+      expect(html).toContain('@page {');
 
+      // Content verification
       if (override.showUserMessages !== false) {
         expect(html).toContain('Hello, explain quantum physics.');
       }
