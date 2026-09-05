@@ -364,9 +364,9 @@ export function renderConversation(
     return true;
   });
 
-  const messagesHtml = filteredMessages
-    .map((msg) => renderMessage(msg, opts.showRoleLabels))
-    .join('');
+  const messagesHtml = filteredMessages.length > 0
+    ? filteredMessages.map((msg) => renderMessage(msg, opts.showRoleLabels)).join('')
+    : '<div class="empty-conversation-notice"><p>[No messages selected for export in settings]</p></div>';
 
   const titleHtml = opts.showConversationTitle
     ? `<h1 class="document-title">${escapeHtml(conversation.title)}</h1>`

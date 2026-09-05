@@ -869,4 +869,13 @@ describe('Phase 13 Correction #3 — Inline vs Fenced Code CSS Isolation', () =>
     expect(lightHtml).toContain('background: #f8fafc;'); // codeLightBg
     expect(lightHtml).toContain('color: #0f172a;');       // codeLightText
   });
+
+  it('9. safely renders document when both user and assistant messages are disabled in settings', () => {
+    const html = renderConversation(conv, { showUserMessages: false, showAssistantMessages: false });
+    expect(html).toContain('<!doctype html>');
+    expect(html).toContain('<html lang="en">');
+    expect(html).toContain('</html>');
+    expect(html).toContain('empty-conversation-notice');
+    expect(html).toContain('No messages selected for export in settings');
+  });
 });

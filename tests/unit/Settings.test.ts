@@ -152,4 +152,18 @@ describe('Settings Defaults & Validation Engine', () => {
     expect(renderOpts.showUserMessages).toBe(false);
     expect(renderOpts.fontFamily).toBe(settings.fontFamily);
   });
+
+  it('13. preserves explicit false role visibility settings without mutating user choices', () => {
+    const bothFalse = validateSettings({ showUserMessages: false, showAssistantMessages: false });
+    expect(bothFalse.showUserMessages).toBe(false);
+    expect(bothFalse.showAssistantMessages).toBe(false);
+
+    const userFalse = validateSettings({ showUserMessages: false, showAssistantMessages: true });
+    expect(userFalse.showUserMessages).toBe(false);
+    expect(userFalse.showAssistantMessages).toBe(true);
+
+    const assistantFalse = validateSettings({ showUserMessages: true, showAssistantMessages: false });
+    expect(assistantFalse.showUserMessages).toBe(true);
+    expect(assistantFalse.showAssistantMessages).toBe(false);
+  });
 });

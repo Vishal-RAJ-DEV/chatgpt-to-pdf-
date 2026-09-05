@@ -114,13 +114,6 @@ export function validateCodeTheme(value: unknown, fallback: CodeTheme): CodeThem
 export function validateSettings(input: unknown): UserSettings {
   const record = typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {};
 
-  const userMsgs = validateBoolean(record.showUserMessages, DEFAULT_SETTINGS.showUserMessages);
-  const assistantMsgs = validateBoolean(record.showAssistantMessages, DEFAULT_SETTINGS.showAssistantMessages);
-
-  // Prevent completely empty message export (which would render a 100% blank page)
-  const safeUserMsgs = !userMsgs && !assistantMsgs ? true : userMsgs;
-  const safeAssistantMsgs = !userMsgs && !assistantMsgs ? true : assistantMsgs;
-
   return {
     pageSize: validatePageSize(record.pageSize, DEFAULT_SETTINGS.pageSize),
     orientation: validateOrientation(record.orientation, DEFAULT_SETTINGS.orientation),
@@ -133,8 +126,8 @@ export function validateSettings(input: unknown): UserSettings {
     baseFontSize: validateCssLength(record.baseFontSize, DEFAULT_SETTINGS.baseFontSize),
     lineHeight: validateLineHeight(record.lineHeight, DEFAULT_SETTINGS.lineHeight),
 
-    showUserMessages: safeUserMsgs,
-    showAssistantMessages: safeAssistantMsgs,
+    showUserMessages: validateBoolean(record.showUserMessages, DEFAULT_SETTINGS.showUserMessages),
+    showAssistantMessages: validateBoolean(record.showAssistantMessages, DEFAULT_SETTINGS.showAssistantMessages),
     showConversationTitle: validateBoolean(record.showConversationTitle, DEFAULT_SETTINGS.showConversationTitle),
     showDate: validateBoolean(record.showDate, DEFAULT_SETTINGS.showDate),
     showRoleLabels: validateBoolean(record.showRoleLabels, DEFAULT_SETTINGS.showRoleLabels),
